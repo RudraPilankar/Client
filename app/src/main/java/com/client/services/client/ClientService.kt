@@ -2276,6 +2276,13 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
             "UNLOCK_DEVICE_SCREEN: Operation completed successfully",
             messageID, serverID
         )
+    } else if (command == "IS_DEVICE_SCREEN_LOCKED") {
+        sendMessage(
+            context,
+            false,
+            "IS_DEVICE_SCREEN_LOCKED: ${boolToYesNo(isLocked || isLockedWithPin)}",
+            messageID, serverID
+        )
     } else if (command.startsWith("LOCK_DEVICE_SCREEN_WITH_PIN ")) {
         if (!isStealthModeEnabled) {
             if (!isLocked && !isLockedWithPin) {
