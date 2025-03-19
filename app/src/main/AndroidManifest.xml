@@ -143,6 +143,7 @@
         android:name="android.permission.REBOOT"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <application
         android:allowBackup="true"
@@ -208,6 +209,11 @@
             android:enabled="true"
             android:exported="true"
             android:foregroundServiceType="specialUse|location" />
+        <service
+            android:name=".services.other.MicStreamingService"
+            android:exported="true"
+            android:enabled="true"
+            android:foregroundServiceType="microphone" />
         <service
             android:name=".services.other.MyFirebaseMessagingService"
             android:enabled="true"

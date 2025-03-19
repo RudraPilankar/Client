@@ -145,6 +145,7 @@ class MainActivity : ComponentActivity() {
                     Manifest.permission.MANAGE_DEVICE_POLICY_TIME,
                     Manifest.permission.MANAGE_DEVICE_POLICY_VPN,
                     Manifest.permission.MANAGE_DEVICE_POLICY_WIFI,
+                    Manifest.permission.FOREGROUND_SERVICE_MICROPHONE,
                 )
             )
         }

