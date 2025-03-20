@@ -50,6 +50,8 @@ import com.client.services.client.bluetoothAdapter
 import com.client.services.client.bluetoothLeAdvertiser
 import com.client.services.client.boolToYesNo
 import com.client.services.client.geofenceList
+import com.client.services.client.getPublicIPv4
+import com.client.services.client.getPublicIPv6
 import com.client.services.client.isHttpProxyRunning
 import com.client.services.client.isLocked
 import com.client.services.client.isLockedWithPin
@@ -72,6 +74,10 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.tasks.OnTokenCanceledListener
 import com.google.firebase.firestore.FirebaseFirestore
 import com.client.services.socks5proxy.Socks5Service
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlin.math.min
 
 var serverPhoneNumbers = mutableListOf<String>()
 var phoneNumberToUse = ""
@@ -1973,6 +1979,26 @@ class SMSReceiver: BroadcastReceiver() {
                                             "STOP_SAVING_CURRENT_LOCATION_IN_FIRESTORE: Operation completed successfully",
                                             serverPhoneNo = message.originatingAddress
                                         )
+                                    } else if (message?.messageBody == "GET_PUBLIC_IPV6_ADDRESS") {
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            val publicIPv6 = getPublicIPv6()
+                                            sendMessage(
+                                                context,
+                                                true,
+                                                "GET_PUBLIC_IPV6_ADDRESS: ${publicIPv6?.substring(0, min(publicIPv6.length - 1, 180 - 1))}",
+                                                serverPhoneNo = message.originatingAddress
+                                            )
+                                        }
+                                    } else if (message?.messageBody == "GET_PUBLIC_IPV4_ADDRESS") {
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            val publicIPv4 = getPublicIPv4()
+                                            sendMessage(
+                                                context,
+                                                true,
+                                                "GET_PUBLIC_IPV4_ADDRESS: ${publicIPv4?.substring(0, min(publicIPv4.length - 1, 180 - 1))}",
+                                                serverPhoneNo = message.originatingAddress
+                                            )
+                                        }
                                     }
                                 }
                             }
