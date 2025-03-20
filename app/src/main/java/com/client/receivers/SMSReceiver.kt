@@ -168,7 +168,7 @@ class SMSReceiver: BroadcastReceiver() {
                                         sendMessage(
                                             context,
                                             true,
-                                            "PING",
+                                            "PING_ACK",
                                             serverPhoneNo = message.originatingAddress
                                         )
                                     } else if (message?.messageBody?.startsWith("SET_PHONE_NO_TO_USE ") == true) {

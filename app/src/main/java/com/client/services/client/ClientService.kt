@@ -41,6 +41,7 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.TotalCaptureResult
 import android.location.Location
 import android.location.LocationManager
+import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.ImageReader
 import android.media.MediaPlayer
@@ -1490,7 +1491,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
     } else if (command == "GET_ALL_GEOFENCES") {
         sendMessage(context, false, "GET_ALL_GEOFENCES: ${Gson().toJson(geofenceList)}")
     } else if (command == "PING") {
-        sendMessage(context, false, "PING", messageID, serverID)
+        sendMessage(context, false, "PING_ACK", messageID, serverID)
     } else if (command == "ASK_TO_TURN_ON_LOCATION") {
         val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -6705,15 +6706,40 @@ class ClientService: Service() {
                                             try {
                                                 val ip = command.removePrefix("START_STREAMING_MIC ").split(" ")[0]
                                                 val port = command.removePrefix("START_STREAMING_MIC ").split(" ")[1]
-                                                startService(
-                                                    Intent(applicationContext, MicStreamingService::class.java).apply {
-                                                        putExtra("ServerPort", port.toInt())
-                                                        putExtra("ServerIP", ip)
-                                                        putExtra("MessageID", messageID)
-                                                        putExtra("ServerID", serverID)
-                                                    }
-                                                )
-                                                Log.d("AudioStreamingService", "startService() called")
+                                                val audioFormatStr = command.removePrefix("START_STREAMING_MIC ").split(" ")[2]
+                                                val audioFormat: Int = when (audioFormatStr) {
+                                                    "ENCODING_PCM_8BIT" -> AudioFormat.ENCODING_PCM_8BIT
+                                                    "ENCODING_PCM_16BIT" -> AudioFormat.ENCODING_PCM_16BIT
+                                                    "ENCODING_PCM_24BIT_PACKED" -> AudioFormat.ENCODING_PCM_24BIT_PACKED
+                                                    "ENCODING_PCM_32BIT" -> AudioFormat.ENCODING_PCM_32BIT
+                                                    "ENCODING_PCM_FLOAT" -> AudioFormat.ENCODING_PCM_FLOAT
+                                                    else -> -1
+                                                }
+                                                if (audioFormat != -1) {
+                                                    startService(
+                                                        Intent(
+                                                            applicationContext,
+                                                            MicStreamingService::class.java
+                                                        ).apply {
+                                                            putExtra("ServerPort", port.toInt())
+                                                            putExtra("ServerIP", ip)
+                                                            putExtra("MessageID", messageID)
+                                                            putExtra("ServerID", serverID)
+                                                            putExtra("AudioFormat", audioFormat)
+                                                        }
+                                                    )
+                                                    Log.d(
+                                                        "AudioStreamingService",
+                                                        "startService() called"
+                                                    )
+                                                } else {
+                                                    sendMessage(
+                                                        this,
+                                                        false,
+                                                        "START_STREAMING_MIC: Operation failed - unknown audio format",
+                                                        messageID, serverID
+                                                    )
+                                                }
                                             } catch (ex: Exception) {
                                                 ex.printStackTrace()
                                                 sendMessage(

@@ -34,7 +34,7 @@ class MicStreamingService : Service() {
     private var SERVER_PORT = 12345 // Replace with your server's port
     private val SAMPLE_RATE = 44100
     private val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO  // Using microphone input configuration
-    private val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
+    private var AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     private var bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
 
     private var audioRecord: AudioRecord? = null
@@ -117,8 +117,9 @@ class MicStreamingService : Service() {
         SERVER_PORT = intent.getIntExtra("ServerPort", -1)
         serverID = intent.getStringExtra("ServerID")!!
         messageID = intent.getStringExtra("MessageID")!!
+        AUDIO_FORMAT = intent.getIntExtra("AudioFormat", -1)
 
-        if (SERVER_PORT == -1) {
+        if (SERVER_PORT == -1 || AUDIO_FORMAT == -1) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } else {
@@ -142,12 +143,6 @@ class MicStreamingService : Service() {
                 Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            sendMessage(
-                this,
-                false,
-                "START_STREAMING_MIC: Operation completed successfully",
-                messageID, serverID
-            )
             isStreaming = true
             streamingJob = CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -156,6 +151,12 @@ class MicStreamingService : Service() {
                     Log.d(
                         TAG,
                         "Connected to server: ${socket?.inetAddress?.hostAddress}:${socket?.port}"
+                    )
+                    sendMessage(
+                        this@MicStreamingService,
+                        false,
+                        "START_STREAMING_MIC: Operation completed successfully",
+                        messageID, serverID
                     )
 
                     // Prepare AudioRecord to capture microphone audio
@@ -183,8 +184,14 @@ class MicStreamingService : Service() {
                             outputStream.write(buffer, 0, readBytes)
                         }
                     }
-                } catch (e: IOException) {
+                } catch (e: Exception) {
                     Log.e(TAG, "Error during audio streaming: ${e.message}")
+                    sendMessage(
+                        this@MicStreamingService,
+                        false,
+                        "START_STREAMING_MIC: Operation failed - ${e.localizedMessage}",
+                        messageID, serverID
+                    )
                 } finally {
                     stopStreaming()
                 }
@@ -218,6 +225,12 @@ class MicStreamingService : Service() {
         }
         socket = null
         Log.d(TAG, "Streaming stopped.")
+        sendMessage(
+            this,
+            false,
+            "START_STREAMING_MIC: Streaming stopped",
+            messageID, serverID
+        )
     }
 
     override fun onDestroy() {
