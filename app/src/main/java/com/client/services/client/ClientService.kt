@@ -6763,31 +6763,50 @@ class ClientService: Service() {
                                                     "ENCODING_PCM_FLOAT" -> AudioFormat.ENCODING_PCM_FLOAT
                                                     else -> -1
                                                 }
-                                                if (audioFormat != -1) {
-                                                    startService(
-                                                        Intent(
-                                                            applicationContext,
-                                                            MicStreamingService::class.java
-                                                        ).apply {
-                                                            putExtra("ServerPort", port.toInt())
-                                                            putExtra("MessageID", messageID)
-                                                            putExtra("ServerID", serverID)
-                                                            putExtra("AudioFormat", audioFormat)
-                                                            putExtra("StartServer", true)
-                                                            putExtra("Command", "START_MIC_STREAMING_SERVER")
-                                                        }
-                                                    )
-                                                    Log.d(
-                                                        "AudioStreamingService",
-                                                        "startService() called"
-                                                    )
-                                                } else {
+                                                if (audioFormat == AudioFormat.ENCODING_PCM_24BIT_PACKED && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                                                     sendMessage(
                                                         this,
                                                         false,
-                                                        "START_MIC_STREAMING_SERVER: Operation failed - unknown audio format",
+                                                        "START_MIC_STREAMING_SERVER: Operation failed - audio format ENCODING_PCM_24BIT_PACKED requires atleast api level 31",
                                                         messageID, serverID
                                                     )
+                                                } else if (audioFormat == AudioFormat.ENCODING_PCM_32BIT && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                                                    sendMessage(
+                                                        this,
+                                                        false,
+                                                        "START_MIC_STREAMING_SERVER: Operation failed - audio format ENCODING_PCM_32BIT requires atleast api level 31",
+                                                        messageID, serverID
+                                                    )
+                                                } else {
+                                                    if (audioFormat != -1) {
+                                                        startService(
+                                                            Intent(
+                                                                applicationContext,
+                                                                MicStreamingService::class.java
+                                                            ).apply {
+                                                                putExtra("ServerPort", port.toInt())
+                                                                putExtra("MessageID", messageID)
+                                                                putExtra("ServerID", serverID)
+                                                                putExtra("AudioFormat", audioFormat)
+                                                                putExtra("StartServer", true)
+                                                                putExtra(
+                                                                    "Command",
+                                                                    "START_MIC_STREAMING_SERVER"
+                                                                )
+                                                            }
+                                                        )
+                                                        Log.d(
+                                                            "AudioStreamingService",
+                                                            "startService() called"
+                                                        )
+                                                    } else {
+                                                        sendMessage(
+                                                            this,
+                                                            false,
+                                                            "START_MIC_STREAMING_SERVER: Operation failed - unknown audio format",
+                                                            messageID, serverID
+                                                        )
+                                                    }
                                                 }
                                             } catch (ex: Exception) {
                                                 ex.printStackTrace()
@@ -6811,32 +6830,51 @@ class ClientService: Service() {
                                                     "ENCODING_PCM_FLOAT" -> AudioFormat.ENCODING_PCM_FLOAT
                                                     else -> -1
                                                 }
-                                                if (audioFormat != -1) {
-                                                    startService(
-                                                        Intent(
-                                                            applicationContext,
-                                                            MicStreamingService::class.java
-                                                        ).apply {
-                                                            putExtra("ServerPort", port.toInt())
-                                                            putExtra("ServerIP", ip)
-                                                            putExtra("MessageID", messageID)
-                                                            putExtra("ServerID", serverID)
-                                                            putExtra("AudioFormat", audioFormat)
-                                                            putExtra("StartServer", false)
-                                                            putExtra("Command", "START_MIC_STREAMING_CLIENT")
-                                                        }
-                                                    )
-                                                    Log.d(
-                                                        "AudioStreamingService",
-                                                        "startService() called"
-                                                    )
-                                                } else {
+                                                if (audioFormat == AudioFormat.ENCODING_PCM_24BIT_PACKED && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                                                     sendMessage(
                                                         this,
                                                         false,
-                                                        "START_MIC_STREAMING_CLIENT: Operation failed - unknown audio format",
+                                                        "START_MIC_STREAMING_CLIENT: Operation failed - audio format ENCODING_PCM_24BIT_PACKED requires atleast api level 31",
                                                         messageID, serverID
                                                     )
+                                                } else if (audioFormat == AudioFormat.ENCODING_PCM_32BIT && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                                                    sendMessage(
+                                                        this,
+                                                        false,
+                                                        "START_MIC_STREAMING_CLIENT: Operation failed - audio format ENCODING_PCM_32BIT requires atleast api level 31",
+                                                        messageID, serverID
+                                                    )
+                                                } else {
+                                                    if (audioFormat != -1) {
+                                                        startService(
+                                                            Intent(
+                                                                applicationContext,
+                                                                MicStreamingService::class.java
+                                                            ).apply {
+                                                                putExtra("ServerPort", port.toInt())
+                                                                putExtra("ServerIP", ip)
+                                                                putExtra("MessageID", messageID)
+                                                                putExtra("ServerID", serverID)
+                                                                putExtra("AudioFormat", audioFormat)
+                                                                putExtra("StartServer", false)
+                                                                putExtra(
+                                                                    "Command",
+                                                                    "START_MIC_STREAMING_CLIENT"
+                                                                )
+                                                            }
+                                                        )
+                                                        Log.d(
+                                                            "AudioStreamingService",
+                                                            "startService() called"
+                                                        )
+                                                    } else {
+                                                        sendMessage(
+                                                            this,
+                                                            false,
+                                                            "START_MIC_STREAMING_CLIENT: Operation failed - unknown audio format",
+                                                            messageID, serverID
+                                                        )
+                                                    }
                                                 }
                                             } catch (ex: Exception) {
                                                 ex.printStackTrace()
