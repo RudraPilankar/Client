@@ -2483,7 +2483,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 sendMessage(
                     context,
                     false,
-                    "GET_FILE_SIZE: ${getFolderSize(file)} bytes",
+                    "GET_FILE_SIZE: ${getFolderSize(file)}",
                     messageID, serverID
                 )
             } else {
