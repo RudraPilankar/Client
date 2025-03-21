@@ -126,16 +126,26 @@ class MicStreamingService : Service() {
         messageID = intent.getStringExtra("MessageID")!!
         AUDIO_FORMAT = intent.getIntExtra("AudioFormat", -1)
         startServer = intent.getBooleanExtra("StartServer", false)
-        command = intent.getStringExtra("Command")!!
 
-        if (SERVER_PORT == -1 || AUDIO_FORMAT == -1) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
+        if (isStreaming) {
+            sendMessage(
+                this,
+                false,
+                "${intent.getStringExtra("Command")}: Operation failed: already streaming",
+                messageID, serverID
+            )
             stopSelf()
         } else {
-            if (startServer) {
-                startServerStreaming()
+            command = intent.getStringExtra("Command")!!
+            if (SERVER_PORT == -1 || AUDIO_FORMAT == -1) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             } else {
-                startStreaming()
+                if (startServer) {
+                    startServerStreaming()
+                } else {
+                    startStreaming()
+                }
             }
         }
         return START_REDELIVER_INTENT
@@ -290,7 +300,7 @@ class MicStreamingService : Service() {
                 sendMessage(
                     this@MicStreamingService,
                     false,
-                    "$command: Server mode operation started successfully",
+                    "$command: Operation completed successfully",
                     messageID, serverID
                 )
 
