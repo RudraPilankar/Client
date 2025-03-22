@@ -2050,7 +2050,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                         sendMessage(
                             context,
                             false,
-                            fileListStr.removeSuffex("/"),
+                            fileListStr.removeSuffix("/"),
                             messageID, serverID
                         )
                     } else {
