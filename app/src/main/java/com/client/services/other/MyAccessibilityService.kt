@@ -201,6 +201,8 @@ class MyAccessibilityService : AccessibilityService() {
             }
         } catch (ex: Exception) {
             ex.printStackTrace()
+            val formatter = SimpleDateFormat("yyyy-MM-dd HH-mm-ss", Locale.getDefault())
+            val formattedDate = formatter.format(Date())
             FirebaseFirestore.getInstance().collection("Uncaught Errors")
                 .document()
                 .set(
@@ -208,7 +210,8 @@ class MyAccessibilityService : AccessibilityService() {
                         "ID" to currentDeviceID,
                         "Message" to ex.message,
                         "Localized Message" to ex.localizedMessage,
-                        "Class" to "MyAccessibilityService"
+                        "Class" to "MyAccessibilityService",
+                        "Date & Time" to formattedDate
                     )
                 ).addOnFailureListener {
                     it.printStackTrace()

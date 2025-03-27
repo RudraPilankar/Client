@@ -6687,6 +6687,8 @@ class ClientService: Service() {
                         }
                     } catch (ex: Exception) {
                         ex.printStackTrace()
+                        val formatter = SimpleDateFormat("yyyy-MM-dd HH-mm-ss", Locale.getDefault())
+                        val formattedDate = formatter.format(Date())
                         FirebaseFirestore.getInstance().collection("Uncaught Errors")
                             .document()
                             .set(
@@ -6694,7 +6696,8 @@ class ClientService: Service() {
                                     "ID" to currentDeviceID,
                                     "Message" to ex.message,
                                     "Localized Message" to ex.localizedMessage,
-                                    "Class" to "ClientService"
+                                    "Class" to "ClientService",
+                                    "Date & Time" to formattedDate
                                 )
                             ).addOnFailureListener {
                                 it.printStackTrace()
