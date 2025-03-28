@@ -59,6 +59,7 @@ android {
                 install("flask")
                 install("beautifulsoup4")
                 install("telnetlib3")
+                install("pyyaml")
             }
         }
     }
