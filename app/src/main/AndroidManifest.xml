@@ -286,6 +286,7 @@
         <service
             android:name=".services.python.PythonInteractiveScriptRunnerService"
             android:enabled="true"
+            android:foregroundServiceType="specialUse"
             android:exported="false"
             android:process=":pythonProcess" />
         <service
