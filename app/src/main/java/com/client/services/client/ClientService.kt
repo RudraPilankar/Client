@@ -4627,15 +4627,15 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 messageID, serverID
             )
         }
-    } else if (command == "STOP_AND_CLEAR_ALL_THREADS") {
+    } else if (command == "INTERRUPT_AND_CLEAR_ALL_THREADS") {
         for (thread in threads) {
             thread.interrupt()
         }
         threads.clear()
-        sendMessage(context, false, "STOP_AND_CLEAR_ALL_THREADS: Operation completed successfully", messageID, serverID)
-    } else if (command.startsWith("STOP_THREAD")) {
+        sendMessage(context, false, "INTERRUPT_AND_CLEAR_ALL_THREADS: Operation completed successfully", messageID, serverID)
+    } else if (command.startsWith("INTERRUPT_THREAD")) {
         try {
-            val threadNo = command.removePrefix("STOP_THREAD").toInt()
+            val threadNo = command.removePrefix("INTERRUPT_THREAD").toInt()
             if (!threads[threadNo].isInterrupted) {
                 if (threads[threadNo].isAlive) {
                     threads[threadNo].interrupt()
@@ -4643,7 +4643,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                     sendMessage(
                         context,
                         false,
-                        "STOP_THREAD: Operation failed - thread is not alive",
+                        "INTERRUPT_THREAD: Operation failed - thread is not alive",
                         messageID, serverID
                     )
                 }
@@ -4651,7 +4651,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 sendMessage(
                     context,
                     false,
-                    "STOP_THREAD: Operation failed - thread is already interrupted",
+                    "INTERRUPT_THREAD: Operation failed - thread is already interrupted",
                     messageID, serverID
                 )
             }
@@ -4660,7 +4660,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
             sendMessage(
                 context,
                 false,
-                "STOP_THREAD: Operation failed - ${ex.localizedMessage}",
+                "INTERRUPT_THREAD: Operation failed - ${ex.localizedMessage}",
                 messageID, serverID
             )
         }
