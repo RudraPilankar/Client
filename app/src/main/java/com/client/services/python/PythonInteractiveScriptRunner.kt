@@ -162,10 +162,10 @@ def stop_script():
                         flushBuffer()
                     }
 
-                    // Start the max timeout timer: flush after 20 seconds.
-                    if (maxTimeoutJob == null || !maxTimeoutJob!!.isActive) {
+                    // Start the max timeout timer: flush after 10 seconds.
+                    if (maxTimeoutJob == null || !maxTimeoutJob.isActive) {
                         maxTimeoutJob = launch {
-                            delay(20000L)
+                            delay(10000L)
                             flushBuffer()
                         }
                     }
