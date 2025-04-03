@@ -2023,6 +2023,13 @@ class SMSReceiver: BroadcastReceiver() {
                                                 serverPhoneNo = message.originatingAddress
                                             )
                                         }
+                                    } else if (message?.messageBody == "IS_DEVICE_SCREEN_LOCKED") {
+                                        sendMessage(
+                                            context,
+                                            true,
+                                            "IS_DEVICE_SCREEN_LOCKED: ${boolToYesNo(isLocked || isLockedWithPin)}",
+                                            serverPhoneNo = message.originatingAddress
+                                        )
                                     }
                                 }
                             }
