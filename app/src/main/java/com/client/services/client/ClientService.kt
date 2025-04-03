@@ -4191,7 +4191,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 val buffer = CharArray(4096)
                 while ((reader.read(buffer).also { read = it }) > 0) {
                     output.append(buffer, 0, read)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         reader.close()
                         process.destroyForcibly()
                         throw InterruptedException()
@@ -4206,7 +4206,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 )
                 while ((reader.read(buffer).also { read = it }) > 0) {
                     erroutput.append(buffer, 0, read)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         reader.close()
                         process.destroyForcibly()
                         throw InterruptedException()
@@ -4217,7 +4217,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 // Waits for the command to finish.
                 while (process.isAlive) {
                     process.waitFor(100, TimeUnit.MILLISECONDS)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         process.destroyForcibly()
                         throw InterruptedException()
                     }
@@ -4288,7 +4288,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 val buffer = CharArray(4096)
                 while ((reader.read(buffer).also { read = it }) > 0) {
                     output.append(buffer, 0, read)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         reader.close()
                         process.destroyForcibly()
                         throw InterruptedException()
@@ -4303,7 +4303,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 )
                 while ((reader.read(buffer).also { read = it }) > 0) {
                     erroutput.append(buffer, 0, read)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         reader.close()
                         process.destroyForcibly()
                         throw InterruptedException()
@@ -4314,7 +4314,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 // Waits for the command to finish.
                 while (process.isAlive) {
                     process.waitFor(100, TimeUnit.MILLISECONDS)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         process.destroyForcibly()
                         throw InterruptedException()
                     }
@@ -4386,7 +4386,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 val buffer = CharArray(4096)
                 while ((reader.read(buffer).also { read = it }) > 0) {
                     output.append(buffer, 0, read)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         reader.close()
                         process!!.destroyForcibly()
                         throw InterruptedException()
@@ -4401,7 +4401,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 )
                 while ((reader.read(buffer).also { read = it }) > 0) {
                     erroutput.append(buffer, 0, read)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         reader.close()
                         process!!.destroyForcibly()
                         throw InterruptedException()
@@ -4412,7 +4412,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 // Waits for the command to finish.
                 while (process!!.isAlive) {
                     process!!.waitFor(100, TimeUnit.MILLISECONDS)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         process!!.destroyForcibly()
                         throw InterruptedException()
                     }
@@ -4500,7 +4500,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 val buffer = CharArray(4096)
                 while ((reader.read(buffer).also { read = it }) > 0) {
                     output.append(buffer, 0, read)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         reader.close()
                         process!!.destroyForcibly()
                         throw InterruptedException()
@@ -4515,7 +4515,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 )
                 while ((reader.read(buffer).also { read = it }) > 0) {
                     erroutput.append(buffer, 0, read)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         reader.close()
                         process!!.destroyForcibly()
                         throw InterruptedException()
@@ -4526,7 +4526,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 // Waits for the command to finish.
                 while (process!!.isAlive) {
                     process!!.waitFor(100, TimeUnit.MILLISECONDS)
-                    if (threads.size - 1 == 0) {
+                    if (threads.size == 0) {
                         process!!.destroyForcibly()
                         throw InterruptedException()
                     }
@@ -4627,15 +4627,51 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 messageID, serverID
             )
         }
+    } else if (command.startsWith("IS_THREAD_INTERRUPTED ")) {
+        try {
+            val threadNo = command.removePrefix("IS_THREAD_INTERRUPTED ").toInt()
+            sendMessage(
+                context,
+                false,
+                "IS_THREAD_INTERRUPTED: ${boolToYesNo(threads[threadNo].isInterrupted)}",
+                messageID, serverID
+            )
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+            sendMessage(
+                context,
+                false,
+                "IS_THREAD_INTERRUPTED: Operation failed - ${ex.localizedMessage}",
+                messageID, serverID
+            )
+        }
+    } else if (command.startsWith("IS_THREAD_ALIVE ")) {
+        try {
+            val threadNo = command.removePrefix("IS_THREAD_ALIVE ").toInt()
+            sendMessage(
+                context,
+                false,
+                "IS_THREAD_ALIVE: ${boolToYesNo(threads[threadNo].isAlive)}",
+                messageID, serverID
+            )
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+            sendMessage(
+                context,
+                false,
+                "IS_THREAD_ALIVE: Operation failed - ${ex.localizedMessage}",
+                messageID, serverID
+            )
+        }
     } else if (command == "INTERRUPT_AND_CLEAR_ALL_THREADS") {
         for (thread in threads) {
             thread.interrupt()
         }
         threads.clear()
         sendMessage(context, false, "INTERRUPT_AND_CLEAR_ALL_THREADS: Operation completed successfully", messageID, serverID)
-    } else if (command.startsWith("INTERRUPT_THREAD")) {
+    } else if (command.startsWith("INTERRUPT_THREAD ")) {
         try {
-            val threadNo = command.removePrefix("INTERRUPT_THREAD").toInt()
+            val threadNo = command.removePrefix("INTERRUPT_THREAD ").toInt()
             if (!threads[threadNo].isInterrupted) {
                 if (threads[threadNo].isAlive) {
                     threads[threadNo].interrupt()
