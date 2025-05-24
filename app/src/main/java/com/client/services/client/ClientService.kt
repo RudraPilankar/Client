@@ -1100,7 +1100,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                 messageID, serverID
             )
         }
-    } else if (command == "IS_ACCESSIBILITY_SERVICE_ENABLED") {
+    } else if (command == "IS_ACCESSIBILITY_SERVICE_RUNNING") { // Old Name: IS_ACCESSIBILITY_SERVICE_ENABLED
         sendMessage(
             context,
             false,
