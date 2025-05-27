@@ -1,8 +1,10 @@
 package com.client.services.virtualshell
 
+import android.content.Context
 import android.os.Environment
 import android.util.Log
 import kotlinx.coroutines.*
+import java.io.File
 import java.io.InputStreamReader
 
 /**
@@ -29,7 +31,7 @@ class VirtualShell(
      * Starts the virtual shell. This version merges stderr into stdout.
      * When the process terminates any pending output is flushed and onShellExit is fired.
      */
-    fun createVirtualShell(shellPath: String, enableInteractiveMode: Boolean = false) {
+    fun createVirtualShell(shellPath: String, context: Context, enableInteractiveMode: Boolean = false) {
         process = if (enableInteractiveMode) {
             ProcessBuilder(shellPath, "-i")
                 .redirectErrorStream(true)
