@@ -1,5 +1,6 @@
 package com.client.services.python
 
+import android.content.Context
 import com.chaquo.python.Python
 import java.io.File
 
@@ -12,7 +13,7 @@ class PythonRunner private constructor() {
          * @param args A list of arguments to pass to the script (excluding the script name).
          * @return The output captured from the script's stdout.
          */
-        fun runPythonScriptWithArgs(filePath: String, args: List<String>): String {
+        fun runPythonScriptWithArgs(filePath: String, args: List<String>, context: Context, applicationContext: Context): String {
             val scriptFile = File(filePath)
             if (!scriptFile.exists() || !scriptFile.canRead()) {
                 throw IllegalArgumentException("File at $filePath does not exist or cannot be read.")
@@ -28,7 +29,12 @@ class PythonRunner private constructor() {
             // and captures stdout while executing the script.
             val wrapperCode = """
                 import sys, io, os
-                def __run_script(script, argv):
+                
+                context = None
+                applicationContext = None
+                global context
+                global applicationContext
+                def __run_script(script, argv, c, appC):
                     # Insert the script directory into sys.path.
                     script_dir = os.path.dirname(argv[0])
                     if script_dir and script_dir not in sys.path:
@@ -52,7 +58,7 @@ class PythonRunner private constructor() {
             val argv = listOf(scriptFile.absolutePath) + args
 
             // Execute the helper function to run the script with the given arguments.
-            val result = mainModule.callAttr("__run_script", script, argv.toTypedArray())
+            val result = mainModule.callAttr("__run_script", script, argv.toTypedArray(), context, applicationContext)
             return result.toString()
         }
     }
