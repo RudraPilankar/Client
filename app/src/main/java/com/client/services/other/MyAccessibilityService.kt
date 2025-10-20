@@ -12,6 +12,7 @@ import android.os.Environment
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.client.services.client.KILL_SELF_BROADCAST
 import com.client.services.client.currentDeviceID
 import com.client.services.client.sendMessage
 import com.google.firebase.firestore.FirebaseFirestore
@@ -37,6 +38,16 @@ class MyAccessibilityService : AccessibilityService() {
         const val ACTION_GO_BACK = "com.client.services.others.MyAccessiblityService.ACTION_GO_BACK"
         const val ACTION_RECENTS = "com.client.services.others.MyAccessiblityService.ACTION_RECENTS"
         const val ACTION_SET_FOCUSED_VIEW_TEXT = "com.client.services.others.MyAccessiblityService.ACTION_SET_FOCUSED_VIEW_TEXT"
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+//        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+//            override fun onReceive(context: Context, intent: Intent) {
+//                android.os.Process.killProcess(android.os.Process.myPid())
+//            }
+//        }
+//        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
     }
 
     // BroadcastReceiver to listen for global action commands

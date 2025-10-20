@@ -1,14 +1,29 @@
 package com.client.services.other
 
 import android.app.Notification
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import com.client.services.client.KILL_SELF_BROADCAST
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class MyNotificationListenerService: NotificationListenerService() {
+    override fun onCreate() {
+        super.onCreate()
+        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
         sbn?.let {

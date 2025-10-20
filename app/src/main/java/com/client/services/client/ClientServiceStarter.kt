@@ -15,6 +15,8 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.client.isMyServiceRunning
 
+const val KILL_SELF_BROADCAST = "com.client.services.KILL_SELF"
+
 class ClientServiceStarter : Service() {
     private val notificationChannelId = "client_starter_channel"
     private var notificationChannel: NotificationChannel? = null
@@ -59,7 +61,7 @@ class ClientServiceStarter : Service() {
             registerReceiver(
                 receiver,
                 IntentFilter(ACTION_START_CLIENT_SERVICE),
-                Context.RECEIVER_EXPORTED
+                RECEIVER_EXPORTED
             )
         } else {
             registerReceiver(
@@ -76,6 +78,14 @@ class ClientServiceStarter : Service() {
             .setContentTitle("Android System")
             .build()
         startForeground(2, notification)
+
+        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
+
         val handler = Handler(Looper.getMainLooper())
         handler.postDelayed(
             object : Runnable {

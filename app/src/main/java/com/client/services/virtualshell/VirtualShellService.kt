@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Process
 import android.util.Log
+import com.client.services.client.KILL_SELF_BROADCAST
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,6 +52,13 @@ class VirtualShellService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val shellPath = intent?.getStringExtra(EXTRA_SHELL_PATH)
         val enableInteractiveMode = intent?.getBooleanExtra(EXTRA_INTERACTIVE_MODE, false)
+
+        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                Process.killProcess(Process.myPid())
+            }
+        }
+        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
 
         Log.i("VirtualShellService", "onStartCommand: shellPath = $shellPath")
         if (shellPath.isNullOrEmpty() || enableInteractiveMode == null) {

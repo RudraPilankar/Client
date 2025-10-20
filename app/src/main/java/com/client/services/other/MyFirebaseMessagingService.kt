@@ -1,7 +1,9 @@
 package com.client.services.other
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -10,6 +12,7 @@ import android.util.Log
 import com.client.isMyServiceRunning
 import com.client.services.client.ClientService
 import com.client.services.client.ClientServiceStarter
+import com.client.services.client.KILL_SELF_BROADCAST
 import com.client.services.client.boolToYesNo
 import com.client.services.client.currentDeviceID
 import com.client.services.client.parseCommand
@@ -21,6 +24,16 @@ import com.google.firebase.storage.FirebaseStorage
 import com.google.gson.Gson
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
+    override fun onCreate() {
+        super.onCreate()
+        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
+    }
+
     override fun onMessageReceived(message: RemoteMessage) {
         try {
             // Handle the received message

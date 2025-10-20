@@ -18,6 +18,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import com.client.services.client.KILL_SELF_BROADCAST
 import com.client.services.client.sendMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -118,6 +119,13 @@ class MicStreamingService : Service() {
             .build()
         startForeground(2, notification)
         Log.d(TAG, "Service started")
+
+        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
 
         // Get connection parameters from the intent
         SERVER_IP = intent!!.getStringExtra("ServerIP").toString()

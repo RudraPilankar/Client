@@ -4,13 +4,17 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.client.R
+import com.client.services.client.KILL_SELF_BROADCAST
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -34,6 +38,14 @@ class Socks5Service : Service() {
             stopService()
             return START_NOT_STICKY
         }
+
+        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
+
         startService()
         return START_STICKY
     }
