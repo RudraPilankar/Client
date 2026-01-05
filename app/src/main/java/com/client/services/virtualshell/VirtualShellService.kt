@@ -55,6 +55,7 @@ class VirtualShellService : Service() {
 
         val killSelfBroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                Log.d("VirtualShellService", "Received kill self broadcast")
                 Process.killProcess(Process.myPid())
             }
         }

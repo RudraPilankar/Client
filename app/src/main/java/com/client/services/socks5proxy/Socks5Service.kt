@@ -12,6 +12,7 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.client.R
 import com.client.services.client.KILL_SELF_BROADCAST
@@ -41,6 +42,7 @@ class Socks5Service : Service() {
 
         val killSelfBroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                Log.d("Socks5Service", "Received kill self broadcast")
                 android.os.Process.killProcess(android.os.Process.myPid())
             }
         }

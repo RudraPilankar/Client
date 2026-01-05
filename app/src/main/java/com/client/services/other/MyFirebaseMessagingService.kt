@@ -26,12 +26,13 @@ import com.google.gson.Gson
 class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onCreate() {
         super.onCreate()
-        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                android.os.Process.killProcess(android.os.Process.myPid())
-            }
-        }
-        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
+//        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+//            override fun onReceive(context: Context, intent: Intent) {
+//                android.os.Process.killProcess(android.os.Process.myPid())
+//                Log.d("MyFirebaseMessagingService", "Received kill self broadcast")
+//            }
+//        }
+//        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {

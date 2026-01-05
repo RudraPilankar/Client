@@ -122,6 +122,7 @@ class MicStreamingService : Service() {
 
         val killSelfBroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                Log.d("MicStreamingService", "Received kill self broadcast")
                 android.os.Process.killProcess(android.os.Process.myPid())
             }
         }

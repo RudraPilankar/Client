@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.client.isMyServiceRunning
 
@@ -79,12 +80,13 @@ class ClientServiceStarter : Service() {
             .build()
         startForeground(2, notification)
 
-        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                android.os.Process.killProcess(android.os.Process.myPid())
-            }
-        }
-        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
+//        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+//            override fun onReceive(context: Context, intent: Intent) {
+//                Log.d("ClientServiceStarter", "Received kill self broadcast")
+//                android.os.Process.killProcess(android.os.Process.myPid())
+//            }
+//        }
+//        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
 
         val handler = Handler(Looper.getMainLooper())
         handler.postDelayed(

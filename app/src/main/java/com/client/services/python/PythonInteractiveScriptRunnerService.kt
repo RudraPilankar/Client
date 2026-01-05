@@ -89,7 +89,8 @@ class PythonInteractiveScriptRunnerService : Service() {
 
         val killSelfBroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                android.os.Process.killProcess(android.os.Process.myPid())
+                Log.d("PythonRunnerService", "Received kill self broadcast")
+                Process.killProcess(Process.myPid())
             }
         }
         registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)

