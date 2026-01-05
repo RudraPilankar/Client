@@ -15,34 +15,17 @@ import java.net.Socket
 import java.util.Locale
 
 
-/**
- * Class for a FTP server worker thread.
- *
- * @author Moritz Stueckler (SID 20414726)
- */
 class MyFTPWorker(
     private val controlSocket: Socket, private val dataPort: Int
 ) : Thread() {
-    /**
-     * Enable debugging output to console
-     */
     private val debugMode = true
-
-    /**
-     * Indicating the last set transfer type
-     */
     private enum class transferType {
         ASCII, BINARY
     }
-
-    /**
-     * Indicates the authentification status of a user
-     */
     private enum class userStatus {
         NOTLOGGEDIN, ENTEREDUSERNAME, LOGGEDIN
     }
 
-    // Path information
     private val root: String
     private var currDirectory: String
     private val fileSeparator = "/"
@@ -50,17 +33,15 @@ class MyFTPWorker(
     private var controlOutWriter: PrintWriter? = null
     private var controlIn: BufferedReader? = null
 
-    // data Connection
     private var dataSocket: ServerSocket? = null
     private var dataConnection: Socket? = null
     private var dataOutWriter: PrintWriter? = null
 
     private var transferMode = transferType.ASCII
 
-    // user properly logged in?
     private var currentUserStatus = userStatus.NOTLOGGEDIN
-    private val validUser = "comp4621"
-    private val validPassword = "network"
+    private var validUser = "comp4621"
+    private var validPassword = "network"
 
     private var quitCommandLoop = false
 
@@ -72,7 +53,7 @@ class MyFTPWorker(
      */
     init {
         this.currDirectory = "/storage/emulated/0"
-        this.root = "/storage/emulated/0"
+        this.root = "/"
     }
 
     /**
@@ -88,7 +69,7 @@ class MyFTPWorker(
             controlOutWriter = PrintWriter(controlSocket.getOutputStream(), true)
 
             // Greeting
-            sendMsgToClient("220 Welcome to the COMP4621 FTP-Server")
+            sendMsgToClient("220 Welcome to the Client FTP-Server")
 
             // Get new command from client
             while (!quitCommandLoop) {
@@ -283,13 +264,24 @@ class MyFTPWorker(
                 path = path.take(ind)
             }
         } else if (args != ".") {
-            path = args
+            // Fix: If args is absolute, prepend the FTP root
+            path = if (args.startsWith(fileSeparator)) {
+                root + args
+            } else {
+                path + fileSeparator + args
+            }
+
+            // Fix: Normalize separators AFTER combining path and args
+            val escapedSeparator = Regex.escape(fileSeparator)
+            path = path.replace(Regex("[$escapedSeparator]+"), fileSeparator)
         }
+        path = path.removeSuffix(fileSeparator)
 
         // check if file exists, is directory and is not above root directory
         val f = File(path)
 
-        if (f.exists() && f.isDirectory() && (path.length >= root.length)) {
+        // Note: Using canonicalPath is safer to prevent ".." directory traversal attacks
+        if (f.exists() && f.isDirectory() && path.length >= root.length) {
             currDirectory = path
             sendMsgToClient("250 The current directory has been changed to " + currDirectory)
         } else {
