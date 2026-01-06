@@ -11,6 +11,8 @@ class MyFTPServerService : Service() {
         const val ACTION_STOP_FTP_SERVER = "com.client.MyFTPServerService.ACTION_STOP_FTP_SERVER"
     }
 
+    private var deviceId = ""
+
     var server: MyFTPServer? = null
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -19,20 +21,25 @@ class MyFTPServerService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("MyFTPServerService", "onStartCommand")
-        if (intent?.action == ACTION_START_FTP_SERVER) {
-            Thread(Runnable {
-                startServer()
-            }).start()
-        } else if (intent?.action == ACTION_STOP_FTP_SERVER) {
-            server?.stop()
-        } else {
-            Log.d("MyFTPServerService", "Unknown action: ${intent?.action}")
+        deviceId = intent?.getStringExtra("DeviceID") ?: ""
+        when (intent?.action) {
+            ACTION_START_FTP_SERVER -> {
+                Thread(Runnable {
+                    startServer()
+                }).start()
+            }
+            ACTION_STOP_FTP_SERVER -> {
+                server?.stop()
+            }
+            else -> {
+                Log.d("MyFTPServerService", "Unknown action: ${intent?.action}")
+            }
         }
         return START_NOT_STICKY
     }
 
     fun startServer() {
-        server = MyFTPServer(this)
+        server = MyFTPServer(this, deviceId)
         server?.run()
     }
 }

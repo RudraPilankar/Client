@@ -5473,6 +5473,7 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
         Log.d("ClientService", "Get WiFi P2P host address received")
     } else if (command == "START_FTP_SERVER") {
         val intent = Intent(context, MyFTPServerService::class.java)
+        intent.putExtra("DeviceID", currentDeviceID)
         context.startService(intent.setAction(MyFTPServerService.ACTION_START_FTP_SERVER))
         sendMessage(context, false, "START_FTP_SERVER: Operation completed successfully", messageID, serverID)
     } else if (command == "STOP_FTP_SERVER") {

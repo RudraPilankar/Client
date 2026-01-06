@@ -1,6 +1,7 @@
 package com.client.services.ftpserver
 
 import android.content.Context
+import android.util.Log
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.BufferedReader
@@ -18,7 +19,8 @@ import java.util.Locale
 
 class MyFTPWorker(
     private val context: Context,
-    private val controlSocket: Socket, private val dataPort: Int
+    private val controlSocket: Socket, private val dataPort: Int,
+    private val deviceId: String
 ) : Thread() {
     private val debugMode = true
     private enum class transferType {
@@ -69,7 +71,7 @@ class MyFTPWorker(
             controlOutWriter = PrintWriter(controlSocket.getOutputStream(), true)
 
             // Greeting
-            sendMsgToClient("220 Welcome to the Client FTP-Server")
+            sendMsgToClient("220 Welcome to the $deviceId FTP-Server")
 
             // Get new command from client
             while (!quitCommandLoop) {
@@ -217,9 +219,9 @@ class MyFTPWorker(
      * @param username Username entered by the user
      */
     private fun handleUser(username: String) {
-        if (!requireLogin()) return
         val preferences = context.getSharedPreferences("Preferences", Context.MODE_MULTI_PROCESS)
         val ftpUsername = preferences.getString("FtpUsername", "client")
+        Log.d("FTPServer", "FTP Username: $ftpUsername")
         if (username.lowercase(Locale.getDefault()) == ftpUsername) {
             sendMsgToClient("331 User name okay, need password")
             currentUserStatus = userStatus.ENTEREDUSERNAME
@@ -237,13 +239,12 @@ class MyFTPWorker(
      * @param password Password entered by the user
      */
     private fun handlePass(password: String) {
-        if (!requireLogin()) return
         // User has entered a valid username and password is correct
         val preferences = context.getSharedPreferences("Preferences", Context.MODE_MULTI_PROCESS)
         val ftpPassword = preferences.getString("FtpPassword", "admin")
         if (currentUserStatus == userStatus.ENTEREDUSERNAME && password == ftpPassword) {
             currentUserStatus = userStatus.LOGGEDIN
-            sendMsgToClient("230-Welcome to Client FTP-Server")
+            sendMsgToClient("230-Welcome to $deviceId FTP-Server")
             sendMsgToClient("230 User logged in successfully")
         } else if (currentUserStatus == userStatus.LOGGEDIN) {
             sendMsgToClient("530 User already logged in")
