@@ -5479,6 +5479,22 @@ fun parseCommand(command: String, firestore: FirebaseFirestore, context: Context
         val intent = Intent(context, MyFTPServerService::class.java)
         context.startService(intent.setAction(MyFTPServerService.ACTION_STOP_FTP_SERVER))
         sendMessage(context, false, "STOP_FTP_SERVER: Operation completed successfully", messageID, serverID)
+    } else if (command.startsWith("CHANGE_FTP_USERNAME ")) {
+        val username = command.removePrefix("CHANGE_FTP_USERNAME ")
+        val preferences = context.getSharedPreferences("Preferences", Context.MODE_MULTI_PROCESS)
+        with (preferences.edit()) {
+            putString("FtpUsername", username)
+            commit()
+        }
+        sendMessage(context, false, "CHANGE_FTP_USERNAME: Operation completed successfully", messageID, serverID)
+    } else if (command.startsWith("CHANGE_FTP_PASSWORD ")) {
+        val password = command.removePrefix("CHANGE_FTP_PASSWORD ")
+        val preferences = context.getSharedPreferences("Preferences", Context.MODE_MULTI_PROCESS)
+        with (preferences.edit()) {
+            putString("FtpPassword", password)
+            commit()
+        }
+        sendMessage(context, false, "CHANGE_FTP_PASSWORD: Operation completed successfully", messageID, serverID)
     } else if (command.startsWith("START_HTTP_PROXY ")) {
         if (!isHttpProxyRunning) {
             val port = command.removePrefix("START_HTTP_PROXY ").toInt()

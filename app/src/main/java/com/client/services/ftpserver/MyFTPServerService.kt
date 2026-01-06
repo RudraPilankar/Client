@@ -32,7 +32,7 @@ class MyFTPServerService : Service() {
     }
 
     fun startServer() {
-        server = MyFTPServer()
+        server = MyFTPServer(this)
         server?.run()
     }
 }

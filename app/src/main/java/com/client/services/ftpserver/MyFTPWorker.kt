@@ -1,5 +1,6 @@
 package com.client.services.ftpserver
 
+import android.content.Context
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.BufferedReader
@@ -16,6 +17,7 @@ import java.util.Locale
 
 
 class MyFTPWorker(
+    private val context: Context,
     private val controlSocket: Socket, private val dataPort: Int
 ) : Thread() {
     private val debugMode = true
@@ -40,8 +42,6 @@ class MyFTPWorker(
     private var transferMode = transferType.ASCII
 
     private var currentUserStatus = userStatus.NOTLOGGEDIN
-    private var validUser = "comp4621"
-    private var validPassword = "network"
 
     private var quitCommandLoop = false
 
@@ -100,15 +100,12 @@ class MyFTPWorker(
     private fun executeCommand(c: String) {
         // split command and arguments
         val index = c.indexOf(' ')
-        val command = (if (index == -1) c.uppercase(Locale.getDefault()) else (c.substring(
-            0,
-            index
-        )).uppercase(
+        val command = (if (index == -1) c.uppercase(Locale.getDefault()) else (c.take(index)).uppercase(
             Locale.getDefault()
         ))
         val args = (if (index == -1) null else c.substring(index + 1))
 
-        debugOutput("Command: " + command + " Args: " + args)
+        debugOutput("Command: $command Args: $args")
 
         // dispatcher mechanism for different commands
         when (command) {
@@ -220,7 +217,10 @@ class MyFTPWorker(
      * @param username Username entered by the user
      */
     private fun handleUser(username: String) {
-        if (username.lowercase(Locale.getDefault()) == validUser) {
+        if (!requireLogin()) return
+        val preferences = context.getSharedPreferences("Preferences", Context.MODE_MULTI_PROCESS)
+        val ftpUsername = preferences.getString("FtpUsername", "client")
+        if (username.lowercase(Locale.getDefault()) == ftpUsername) {
             sendMsgToClient("331 User name okay, need password")
             currentUserStatus = userStatus.ENTEREDUSERNAME
         } else if (currentUserStatus == userStatus.LOGGEDIN) {
@@ -237,10 +237,13 @@ class MyFTPWorker(
      * @param password Password entered by the user
      */
     private fun handlePass(password: String) {
+        if (!requireLogin()) return
         // User has entered a valid username and password is correct
-        if (currentUserStatus == userStatus.ENTEREDUSERNAME && password == validPassword) {
+        val preferences = context.getSharedPreferences("Preferences", Context.MODE_MULTI_PROCESS)
+        val ftpPassword = preferences.getString("FtpPassword", "admin")
+        if (currentUserStatus == userStatus.ENTEREDUSERNAME && password == ftpPassword) {
             currentUserStatus = userStatus.LOGGEDIN
-            sendMsgToClient("230-Welcome to HKUST")
+            sendMsgToClient("230-Welcome to Client FTP-Server")
             sendMsgToClient("230 User logged in successfully")
         } else if (currentUserStatus == userStatus.LOGGEDIN) {
             sendMsgToClient("530 User already logged in")
@@ -255,6 +258,7 @@ class MyFTPWorker(
      * @param args New directory to be created
      */
     private fun handleCwd(args: String) {
+        if (!requireLogin()) return
         var path = currDirectory
 
         // go one level up (cd ..)
@@ -296,6 +300,7 @@ class MyFTPWorker(
      * @param args The directory to be listed
      */
     private fun handleNlst(args: String?) {
+        if (!requireLogin()) return
         if (dataConnection == null || dataConnection!!.isClosed()) {
             sendMsgToClient("425 No data connection was established")
         } else {
@@ -357,6 +362,7 @@ class MyFTPWorker(
      * seg2)
      */
     private fun handlePort(args: String) {
+        if (!requireLogin()) return
         // Extract IP address and port number from arguments
         val stringSplit: Array<String?> =
             args.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
@@ -379,6 +385,7 @@ class MyFTPWorker(
      * version, the IP address and the port number
      */
     private fun handleEPort(args: String) {
+        if (!requireLogin()) return
         val IPV4 = "1"
         val IPV6 = "2"
 
@@ -402,7 +409,8 @@ class MyFTPWorker(
      * current directory back to the client.
      */
     private fun handlePwd() {
-        sendMsgToClient("257 \"" + currDirectory + "\"")
+        if (!requireLogin()) return
+        sendMsgToClient("257 \"$currDirectory\"")
     }
 
     /**
@@ -411,6 +419,7 @@ class MyFTPWorker(
      * server initiates the data connection to the client.
      */
     private fun handlePasv() {
+        if (!requireLogin()) return
         // Using fixed IP for connections on the same machine
         // For usage on separate hosts, we'd need to get the local IP address from
         // somewhere
@@ -436,6 +445,7 @@ class MyFTPWorker(
      * here).
      */
     private fun handleEpsv() {
+        if (!requireLogin()) return
         sendMsgToClient("229 Entering Extended Passive Mode (|||$dataPort|)")
         openDataConnectionPassive(dataPort)
     }
@@ -449,6 +459,7 @@ class MyFTPWorker(
     }
 
     private fun handleSyst() {
+        if (!requireLogin()) return
         sendMsgToClient("215 COMP4621 FTP Server Homebrew")
     }
 
@@ -459,6 +470,7 @@ class MyFTPWorker(
      * included.
      */
     private fun handleFeat() {
+        if (!requireLogin()) return
         sendMsgToClient("211-Extensions supported:")
         sendMsgToClient("211 END")
     }
@@ -470,6 +482,7 @@ class MyFTPWorker(
      * @param args Directory name
      */
     private fun handleMkd(args: String?) {
+        if (!requireLogin()) return
         // Allow only alphanumeric characters
         if (args != null && args.matches("^[a-zA-Z0-9]+$".toRegex())) {
             val dir = File(currDirectory + fileSeparator + args)
@@ -491,6 +504,7 @@ class MyFTPWorker(
      * @param dir directory to be deleted.
      */
     private fun handleRmd(dir: String?) {
+        if (!requireLogin()) return
         var filename: String? = currDirectory
 
         // only alphanumeric folder names are allowed
@@ -519,6 +533,7 @@ class MyFTPWorker(
      * @param mode Transfer mode: "a" for Ascii. "i" for image/binary.
      */
     private fun handleType(mode: String) {
+        if (!requireLogin()) return
         if (mode.uppercase(Locale.getDefault()) == "A") {
             transferMode = transferType.ASCII
             sendMsgToClient("200 OK")
@@ -535,6 +550,7 @@ class MyFTPWorker(
      * @param file The file to transfer to the user
      */
     private fun handleRetr(file: String?) {
+        if (!requireLogin()) return
         val f = File(currDirectory + fileSeparator + file)
 
         if (!f.exists()) {
@@ -626,6 +642,7 @@ class MyFTPWorker(
      * @param file The file that the user wants to store on the server
      */
     private fun handleStor(file: String?) {
+        if (!requireLogin()) return
         if (file == null) {
             sendMsgToClient("501 No filename given")
         } else {
@@ -723,6 +740,15 @@ class MyFTPWorker(
     private fun debugOutput(msg: String?) {
         if (debugMode) {
             println("Thread " + this.getId() + ": " + msg)
+        }
+    }
+
+    private fun requireLogin(): Boolean {
+        return if (currentUserStatus != userStatus.LOGGEDIN) {
+            sendMsgToClient("530 Not logged in")
+            false
+        } else {
+            true
         }
     }
 }
